@@ -1297,7 +1297,20 @@ function renderHow(){
    The IEC feed can't be read cross-site, so a GitHub Action (scripts/fetch_results.py)
    copies it to the live-data branch about once a minute; results/live.json on master is
    a fallback copy. */
-const RES_URLS = ['https://raw.githubusercontent.com/JacoStassen/voting/live-data/live.json', 'results/live.json'];
+const RAW_BASE = 'https://raw.githubusercontent.com/JacoStassen/voting/';
+const SHA_API = 'https://api.github.com/repos/JacoStassen/voting/commits/live-data';
+let shaTag = null, shaVal = null;
+/* raw.githubusercontent caches branch names for ~5 minutes, so look up the newest
+   live-data commit (ETag-conditional, so unchanged checks don't use the API quota)
+   and fetch that exact, never-stale file. */
+async function liveUrls(){
+ try{
+  const h = {Accept:'application/vnd.github.sha'}; if(shaTag) h['If-None-Match']=shaTag;
+  const r = await fetch(SHA_API, {headers:h, cache:'no-cache'});
+  if(r.ok){ const v=(await r.text()).trim(); if(/^[0-9a-f]{40}$/.test(v)){ shaVal=v; shaTag=r.headers.get('ETag'); } }
+ }catch(e){}
+ return [shaVal ? RAW_BASE+shaVal+'/live.json' : null, RAW_BASE+'live-data/live.json', 'results/live.json'].filter(Boolean);
+}
 const IEC_DASH = 'https://results.elections.org.za/dashboards/lge/';
 const IEC2SITE = {'ANC':'anc','DA':'da','MKP':'mk','EFF':'eff','IFP':'ifp','PA':'pa','VF PLUS':'ffplus','ACTIONSA':'actionsa','ACDP':'acdp','UDM':'udm','ATM':'atm','BOSA':'bosa','RISE':'rise','GOOD':'good','ALJAMA':'aljamaah','SACP':'sacp','MAYIBUYE':'amm'};
 const IEC2CAND = {'MKP':'M.K'};
@@ -1310,8 +1323,9 @@ async function loadResults(){
  if(R.busy) return; R.busy=true;
  try{
   let got=null, last=null;
-  for(const u of RES_URLS){
-   try{ const r=await fetch(u+'?t='+Date.now(), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); got=await r.json(); break; }
+  for(const u of await liveUrls()){
+   const pinned = shaVal && u.includes(shaVal); // a file at a fixed commit never changes, so it can be cached
+   try{ const r=await fetch(pinned ? u : u+'?t='+Date.now(), {cache: pinned ? 'default' : 'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); got=await r.json(); break; }
    catch(e){ last=e; }
   }
   if(!got) throw last;
