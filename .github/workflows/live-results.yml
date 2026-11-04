@@ -40,7 +40,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           OUT="$RUNNER_TEMP/live.json"
           # Start from the last published copy so a failed province keeps its data.
-          if git fetch -q origin live-data 2>/dev/null; then git show FETCH_HEAD:live.json > "$OUT"; else cp results/live.json "$OUT"; fi
+          if git fetch -q origin live-data 2>/dev/null; then git show FETCH_HEAD:live.json > "$OUT"; first=false; else cp results/live.json "$OUT"; first=true; fi
 
           publish() {
             blob=$(git hash-object -w "$OUT")
@@ -57,7 +57,7 @@ jobs:
           final=false
           while :; do
             started=$SECONDS
-            if python3 scripts/fetch_results.py --out "$OUT" | tee /dev/stderr | grep -q '^wrote'; then publish; fi
+            if python3 scripts/fetch_results.py --out "$OUT" | tee /dev/stderr | grep -q '^wrote' || [ "$first" = true ]; then publish; first=false; fi
             if is_final; then final=true; echo "Counting complete"; break; fi
             [ $SECONDS -ge $end ] && break
             sleep $(( 60 - (SECONDS - started) > 5 ? 60 - (SECONDS - started) : 5 ))
