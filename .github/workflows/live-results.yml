@@ -49,6 +49,18 @@ jobs:
             git push -q -f origin "$commit:refs/heads/live-data"
             echo "published $(date -u +%T)"
           }
+          # Also keep results/live.json on master current (the page's fallback copy).
+          # Each master commit triggers a Pages build, so do this at most every 5 minutes.
+          last_master=-1000
+          to_master() {
+            [ $((SECONDS - last_master)) -lt 300 ] && return 0
+            cp "$OUT" results/live.json
+            git diff --quiet -- results/live.json && return 0
+            git add results/live.json
+            git commit -q -m "Update live results"
+            git pull -q --rebase origin "$GITHUB_REF_NAME" && git push -q origin "HEAD:$GITHUB_REF_NAME" && echo "master updated $(date -u +%T)"
+            last_master=$SECONDS
+          }
           is_final() {
             python3 -c "import json,sys;p=json.load(open('$OUT'))['prog'];sys.exit(0 if p['munis'][1] and p['munis'][0]>=p['munis'][1] and p['vd'][0]>=p['vd'][1] else 1)"
           }
@@ -58,6 +70,7 @@ jobs:
           while :; do
             started=$SECONDS
             if python3 scripts/fetch_results.py --out "$OUT" | tee /dev/stderr | grep -q '^wrote' || [ "$first" = true ]; then publish; first=false; fi
+            to_master || echo "warn: master update failed"
             if is_final; then final=true; echo "Counting complete"; break; fi
             [ $SECONDS -ge $end ] && break
             sleep $(( 60 - (SECONDS - started) > 5 ? 60 - (SECONDS - started) : 5 ))
