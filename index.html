@@ -1295,8 +1295,9 @@ function renderHow(){
 
 /* ============ LIVE RESULTS ============
    The IEC feed can't be read cross-site, so a GitHub Action (scripts/fetch_results.py)
-   copies it into results/live.json every few minutes. */
-const RES_URL = 'results/live.json';
+   copies it to the live-data branch about once a minute; results/live.json on master is
+   a fallback copy. */
+const RES_URLS = ['https://raw.githubusercontent.com/JacoStassen/voting/live-data/live.json', 'results/live.json'];
 const IEC_DASH = 'https://results.elections.org.za/dashboards/lge/';
 const IEC2SITE = {'ANC':'anc','DA':'da','MKP':'mk','EFF':'eff','IFP':'ifp','PA':'pa','VF PLUS':'ffplus','ACTIONSA':'actionsa','ACDP':'acdp','UDM':'udm','ATM':'atm','BOSA':'bosa','RISE':'rise','GOOD':'good','ALJAMA':'aljamaah','SACP':'sacp','MAYIBUYE':'amm'};
 const IEC2CAND = {'MKP':'M.K'};
@@ -1308,9 +1309,13 @@ const R = {data:null, err:null, loadedAt:0, busy:false,
 async function loadResults(){
  if(R.busy) return; R.busy=true;
  try{
-  const r = await fetch(RES_URL+'?t='+Date.now(), {cache:'no-store'});
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  R.data = await r.json(); R.err = null;
+  let got=null, last=null;
+  for(const u of RES_URLS){
+   try{ const r=await fetch(u+'?t='+Date.now(), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); got=await r.json(); break; }
+   catch(e){ last=e; }
+  }
+  if(!got) throw last;
+  R.data = got; R.err = null;
  }catch(e){ R.err = e; }
  R.loadedAt = Date.now(); R.busy=false;
  const pill=document.getElementById('livePill');
@@ -1554,7 +1559,7 @@ function renderResults(){
  const typing = keepFocus && keepFocus.id==='rq';
  if(typing) return; // don't redraw under someone typing in the council search
  s.innerHTML = head+resHeader()+`<div id="resBody">${views[R.view]()}</div>`+
-  `<p class="src" style="margin-top:22px">Source: Electoral Commission of South Africa results feed, copied here every few minutes. Figures can change until the IEC declares each council. Ward candidate names come from the IEC's certified list; check the <a href="${IEC_DASH}" target="_blank" rel="noopener">IEC dashboard</a> for official results.</p>`;
+  `<p class="src" style="margin-top:22px">Source: Electoral Commission of South Africa results feed, copied here about once a minute. Figures can change until the IEC declares each council. Ward candidate names come from the IEC's certified list; check the <a href="${IEC_DASH}" target="_blank" rel="noopener">IEC dashboard</a> for official results.</p>`;
  if(sel){ const el=s.querySelector(sel); el&&el.focus({preventScroll:true}); }
  if(R.view==='wards' && document.getElementById('rq')) wireCombo('rq','sugg3',(label,m)=>{ if(!R.data.munis[m.code]) return; document.getElementById('rq').blur(); setRes({muni:m.code, ward:null, hl:null}); });
 }

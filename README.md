@@ -35,7 +35,9 @@ Official help: IEC contact centre 0800 11 8000. Voting stations open 07:00 to 21
 
 The **Live results** tab shows the 2026 count by province, metro, district, council and ward.
 
-The IEC's results feed (`results.elections.org.za/dashboards/lge/MapsJason/…`) can't be read by browsers on other sites (it sends no CORS headers). So the `Live results relay` GitHub Action runs `scripts/fetch_results.py` every 5 minutes. It condenses the national and nine provincial feeds into `results/live.json` (about 150 KB when complete) and commits that file. The page fetches it from its own origin once a minute.
+The IEC's results feed (`results.elections.org.za/dashboards/lge/MapsJason/…`) can't be read by browsers on other sites (it sends no CORS headers). So the `Live results relay` GitHub Action runs `scripts/fetch_results.py` about once a minute. It condenses the national and nine provincial feeds into `live.json` (about 150 KB when complete) and force-pushes it as a single commit to the `live-data` branch, so no Pages builds are triggered. The page reads it from `raw.githubusercontent.com` once a minute and falls back to `results/live.json` on `master`.
+
+- GitHub's cron is best effort, so each run loops for 25 minutes and then starts the next run itself. The 5-minute schedule is only a backstop. Chaining stops when counting is complete, or after 12 November 2026. After that, disable the workflow in the Actions tab.
 
 - Run the relay by hand from the Actions tab (**Run workflow**), or locally with `python3 scripts/fetch_results.py`.
 - Test with full 2021 results: `python3 scripts/fetch_results.py --event 1091 --year 2021`. The page shows a "Test data" banner. Run it again without arguments afterwards so you don't commit 2021 data.

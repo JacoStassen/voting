@@ -1,8 +1,12 @@
 name: Live results relay
 
-# Copies the IEC's 2026 local-election results into results/live.json so the site can
-# read them from its own origin (the IEC feed blocks cross-site browser reads).
-# GitHub runs scheduled jobs at most every 5 minutes, and often a few minutes late.
+# Copies the IEC's 2026 local-election results to the `live-data` branch (live.json),
+# which the site reads via raw.githubusercontent.com (the IEC feed blocks cross-site reads).
+#
+# GitHub's cron is best effort (often 10-30 minutes late), so each run loops for about
+# 25 minutes, fetching every minute, then starts the next run itself. The schedule is
+# only a backstop in case that chain breaks. Once counting is complete, runs fetch
+# once and stop chaining.
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -10,7 +14,7 @@ on:
 
 permissions:
   contents: write
-  pages: write
+  actions: write
 
 concurrency:
   group: live-results
@@ -19,26 +23,59 @@ concurrency:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 40
+    outputs:
+      final: ${{ steps.loop.outputs.final }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Fetch IEC results
-        run: python3 scripts/fetch_results.py
-      - name: Commit if changed
+      - name: Fetch and publish every minute
+        id: loop
         env:
-          GH_TOKEN: ${{ github.token }}
+          LOOP_MINUTES: "25"
         run: |
-          if git diff --quiet -- results/live.json && git ls-files --error-unmatch results/live.json >/dev/null 2>&1; then
-            echo "No change"; exit 0
-          fi
           git config user.name "results-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add results/live.json
-          git commit -m "Update live results"
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push
-          # Pushes made with the workflow token don't always trigger a Pages build, so ask for one.
-          gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/dev/null || true
+          OUT="$RUNNER_TEMP/live.json"
+          # Start from the last published copy so a failed province keeps its data.
+          if git fetch -q origin live-data 2>/dev/null; then git show FETCH_HEAD:live.json > "$OUT"; else cp results/live.json "$OUT"; fi
+
+          publish() {
+            blob=$(git hash-object -w "$OUT")
+            tree=$(printf '100644 blob %s\tlive.json\n' "$blob" | git mktree)
+            commit=$(git commit-tree "$tree" -m "Live results $(date -u +%FT%TZ)")
+            git push -q -f origin "$commit:refs/heads/live-data"
+            echo "published $(date -u +%T)"
+          }
+          is_final() {
+            python3 -c "import json,sys;p=json.load(open('$OUT'))['prog'];sys.exit(0 if p['munis'][1] and p['munis'][0]>=p['munis'][1] and p['vd'][0]>=p['vd'][1] else 1)"
+          }
+
+          end=$((SECONDS + LOOP_MINUTES * 60))
+          final=false
+          while :; do
+            started=$SECONDS
+            if python3 scripts/fetch_results.py --out "$OUT" | tee /dev/stderr | grep -q '^wrote'; then publish; fi
+            if is_final; then final=true; echo "Counting complete"; break; fi
+            [ $SECONDS -ge $end ] && break
+            sleep $(( 60 - (SECONDS - started) > 5 ? 60 - (SECONDS - started) : 5 ))
+          done
+          echo "final=$final" >> "$GITHUB_OUTPUT"
+
+  next:
+    needs: fetch
+    # Keep the chain going (even if this run failed) until counting is complete.
+    if: always() && needs.fetch.outputs.final != 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Start the next run
+        run: |
+          # Safety stop: no self-chaining after counting week (the cron backstop still runs).
+          if [ "$(date -u +%Y%m%d)" -gt 20261112 ]; then echo "Past cutoff, not chaining"; exit 0; fi
+          # Don't spin if the fetch job is failing fast.
+          if [ "${{ needs.fetch.result }}" != "success" ]; then sleep 120; fi
+          gh workflow run live-results.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
