@@ -240,6 +240,70 @@ table.wt tr.won td{background:var(--violet-soft)}
 .pres{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
 footer{border-top:2px solid var(--ink);padding:28px 0 44px;font-size:.92rem;color:var(--muted)}
 footer p{max-width:80ch}
+/* Live results */
+.live-pill{display:inline-flex;align-items:center;gap:5px;margin-left:6px;padding:1px 8px;border-radius:99px;background:var(--concern);color:#fff;font-size:.74rem;letter-spacing:.04em;text-transform:uppercase;vertical-align:1px}
+.live-pill::before,.live-dot{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1.6s ease-in-out infinite}
+.live-pill[hidden]{display:none}
+.live-dot{display:inline-block;color:var(--concern);margin-right:4px;vertical-align:1px}
+.live-dot.final{animation:none;color:var(--good)}
+@keyframes pulse{50%{opacity:.25}}
+.res-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:0 0 18px;color:var(--muted);font-size:.93rem}
+.res-meta b{color:var(--ink)}
+.prog-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 24px}
+.tile{background:var(--sheet);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+.tile .k{font-size:.85rem;color:var(--muted);font-weight:700}
+.tile .v{font-family:var(--display);font-weight:800;font-size:1.7rem;line-height:1.15;margin:2px 0 6px}
+.tile .s{font-size:.85rem;color:var(--muted)}
+.stack{display:flex;height:12px;background:var(--track);border-radius:99px;overflow:hidden;position:relative;min-width:80px}
+.stack i{display:block;height:100%;box-shadow:inset -1px 0 0 var(--sheet)}
+.stack.thin{height:8px}
+.stack .maj{position:absolute;top:0;bottom:0;width:3px;background:var(--ink);transform:translateX(-1.5px)}
+.pchip{display:inline-flex;align-items:center;font-weight:700;white-space:nowrap}
+.pchip .pdot{margin-right:6px}
+.tally{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.9rem;margin-top:6px;color:var(--muted)}
+.tally b{color:var(--ink)}
+.status{display:inline-block;font-size:.8rem;font-weight:700;padding:2px 10px;border-radius:99px;border:1px solid var(--line);background:var(--paper);white-space:nowrap}
+.status.won{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.status.hung{background:var(--concern-soft);border-color:var(--concern);color:var(--concern)}
+.status.lead{background:var(--violet-soft);border-color:var(--violet);color:var(--ink)}
+.crumbs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 16px;font-size:.95rem}
+.crumbs button{border:0;background:none;padding:0;color:var(--violet);font-weight:700;text-decoration:underline;cursor:pointer}
+.crumbs span[aria-hidden]{color:var(--muted)}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.rcard{background:var(--sheet);border:2px solid var(--ink);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.rcard h3{margin:0;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.rcard h3 small{font-family:var(--body);font-weight:400;font-size:.85rem;color:var(--muted);white-space:nowrap}
+.rcard .big{font-family:var(--display);font-weight:800;font-size:1.3rem;line-height:1.2;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rcard .lbl{font-size:.82rem;font-weight:700;color:var(--muted);margin-bottom:4px}
+.rcard .btn{align-self:flex-start;margin-top:auto}
+.mini{list-style:none;margin:0;padding:0}
+.mini li{border-top:1px solid var(--line)}
+.mini li:first-child{border-top:0}
+.mini button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;width:100%;padding:11px 4px;border:0;background:none;text-align:left;cursor:pointer;color:var(--ink)}
+.mini button:hover{background:var(--paper)}
+.mini .nm{font-weight:700}
+.mini .stack{grid-column:1/-1}
+table.ct{min-width:720px}
+table.ct td,table.ct th{vertical-align:middle}
+table.ct tbody th{width:auto;color:var(--ink);font-size:1rem}
+table.nt{min-width:560px}
+table.nt td.num,table.ct td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.pchips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.pchips button{border:1px solid var(--line);background:var(--sheet);border-radius:99px;padding:5px 12px;cursor:pointer;font-size:.9rem;color:var(--ink)}
+.pchips button[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin:0 0 18px}
+.wt2{border:1px solid var(--line);border-top:7px solid var(--c);border-radius:6px;background:var(--sheet);padding:6px 4px 5px;cursor:pointer;text-align:center;color:var(--ink);line-height:1.2;min-width:0}
+.wt2 b{display:block;font-variant-numeric:tabular-nums;font-size:1.02rem}
+.wt2 span{display:block;font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wt2.lead{border-top-style:dashed}
+.wt2.none{border-top-color:var(--line);border-style:dashed}
+.wt2.dim{opacity:.25}
+.wt2[aria-pressed="true"]{outline:3px solid var(--violet);outline-offset:1px}
+.wdetail{background:var(--sheet);border:2px solid var(--ink);border-left:10px solid var(--c);border-radius:8px;padding:14px 20px;margin:0 0 18px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 58px);z-index:5;box-shadow:0 10px 24px -14px rgba(30,27,46,.5)}
+.wdetail h3{margin-bottom:4px}
+.wdetail p{margin:4px 0}
+.key{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.85rem;color:var(--muted);margin:0 0 12px}
+.res-test{border-left-color:var(--concern);background:var(--concern-soft)}
 .theme-btn{border:1px solid var(--line);background:var(--sheet);color:var(--ink);font-weight:700;border-radius:99px;padding:8px 16px;cursor:pointer}
 
 @media (max-width:760px){
@@ -269,6 +333,13 @@ footer p{max-width:80ch}
   .metros{grid-template-columns:1fr}
   .two{grid-template-columns:1fr;gap:16px}
   .seats{grid-template-columns:repeat(20,1fr)}
+  .prog-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .tile{padding:12px}
+  .tile .v{font-size:1.4rem}
+  .rgrid{grid-template-columns:1fr}
+  .res-seg{display:flex;flex-wrap:wrap;border-radius:14px}
+  .res-seg button{flex:1 1 30%}
+  .wgrid{grid-template-columns:repeat(auto-fill,minmax(54px,1fr))}
 }
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
@@ -295,6 +366,7 @@ footer p{max-width:80ch}
 
 <nav class="tabs" aria-label="Sections">
   <div class="wrap" role="tablist" id="tablist">
+    <button class="tab" role="tab" data-tab="results" aria-selected="false" id="resTab">Live results <span class="live-pill" id="livePill" hidden>Live</span></button>
     <button class="tab" role="tab" data-tab="parties" aria-selected="true">Parties</button>
     <button class="tab" role="tab" data-tab="compare" aria-selected="false">Compare <span class="count" id="cmpCount">0</span></button>
     <button class="tab" role="tab" data-tab="lens" aria-selected="false">Christian voter's lens</button>
@@ -305,6 +377,8 @@ footer p{max-width:80ch}
 </nav>
 
 <main class="wrap">
+
+  <section id="s-results" hidden aria-labelledby="h-results"></section>
 
   <section id="s-parties" aria-labelledby="h-parties">
     <h2 id="h-parties">The parties</h2>
@@ -556,6 +630,8 @@ const METROS = {
 const MAYORS_SRC = 'https://www.dailymaverick.co.za/article/2026-10-01-local-government-elections-2026/';
 
 
+const POLLS_CLOSE = Date.parse('2026-11-04T21:00:00+02:00');
+
 /* ============ STATE ============ */
 const store = {
  get(k,d){try{const v=localStorage.getItem('kyb:'+k);return v?JSON.parse(v):d}catch(e){return d}},
@@ -587,7 +663,7 @@ function applyMode(){
  const days = Math.ceil((new Date('2026-11-04T07:00:00+02:00') - new Date())/86400000);
  document.getElementById('countdown').textContent = nat
   ? 'The next national and provincial election is due by mid-2029.'
-  : (days>1 ? days+' days until voting stations open on 4 November.' : days===1 ? 'Voting stations open tomorrow.' : 'Local election day: 4 November 2026.');
+  : (days>1 ? days+' days until voting stations open on 4 November.' : days===1 ? 'Voting stations open tomorrow.' : Date.now()>=POLLS_CLOSE ? 'Voting has closed and counting is under way. Follow it on the Live results tab.' : 'Local election day: 4 November 2026.');
  renderAll();
 }
 function toggleMode(){state.mode = state.mode==='local'?'national':'local'; store.set('mode',state.mode); applyMode()}
@@ -599,7 +675,7 @@ function showTab(name){
  state.tab=name;
  const tl=document.getElementById('tablist');
  document.querySelectorAll('.tab').forEach(t=>{const sel=t.dataset.tab===name; t.setAttribute('aria-selected',sel?'true':'false'); if(sel&&tl){const tr=t.getBoundingClientRect(),lr=tl.getBoundingClientRect(); tl.scrollTo({left:tl.scrollLeft+(tr.left-lr.left)-(lr.width-tr.width)/2,behavior:'smooth'})}});
- ['parties','compare','lens','people','cands','how'].forEach(s=>document.getElementById('s-'+s).hidden = s!==name);
+ ['results','parties','compare','lens','people','cands','how'].forEach(s=>document.getElementById('s-'+s).hidden = s!==name);
  const m=document.querySelector('.mast'); if(window.scrollY>m.offsetTop+m.offsetHeight) window.scrollTo({top:m.offsetTop+m.offsetHeight,behavior:'smooth'});
 }
 
@@ -1217,6 +1293,285 @@ function renderHow(){
   </div>`;
 }
 
+/* ============ LIVE RESULTS ============
+   The IEC feed can't be read cross-site, so a GitHub Action (scripts/fetch_results.py)
+   copies it into results/live.json every few minutes. */
+const RES_URL = 'results/live.json';
+const IEC_DASH = 'https://results.elections.org.za/dashboards/lge/';
+const IEC2SITE = {'ANC':'anc','DA':'da','MKP':'mk','EFF':'eff','IFP':'ifp','PA':'pa','VF PLUS':'ffplus','ACTIONSA':'actionsa','ACDP':'acdp','UDM':'udm','ATM':'atm','BOSA':'bosa','RISE':'rise','GOOD':'good','ALJAMA':'aljamaah','SACP':'sacp','MAYIBUYE':'amm'};
+const IEC2CAND = {'MKP':'M.K'};
+const METRO_ORDER = ['JHB','TSH','EKU','ETH','CPT','NMA','MAN','BUF'];
+const R = {data:null, err:null, loadedAt:0, busy:false,
+ view:store.get('rView','overview'), prov:store.get('rProv',null), dist:store.get('rDist',null),
+ muni:store.get('rMuni',null), ward:null, hl:null};
+
+async function loadResults(){
+ if(R.busy) return; R.busy=true;
+ try{
+  const r = await fetch(RES_URL+'?t='+Date.now(), {cache:'no-store'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  R.data = await r.json(); R.err = null;
+ }catch(e){ R.err = e; }
+ R.loadedAt = Date.now(); R.busy=false;
+ const pill=document.getElementById('livePill');
+ if(pill) pill.hidden = !(R.data && R.data.prog.vd[0]>0 && R.data.prog.vd[0]<R.data.prog.vd[1]);
+ if(state.tab==='results') renderResults();
+}
+function setRes(patch){ Object.assign(R,patch); store.set('rView',R.view); store.set('rProv',R.prov); store.set('rDist',R.dist); store.set('rMuni',R.muni); renderResults(); }
+
+/* party helpers: use this site's names and colours where we know the party */
+function rp(id){
+ const m = R.data && R.data.parties[String(id)];
+ const code = m ? m[0] : (id===0 ? 'IND' : '?');
+ const sp = IEC2SITE[code] ? byId(IEC2SITE[code]) : null;
+ return {id, code, site:sp,
+  abbr: sp ? sp.abbr : code==='IND' ? 'Independent' : code==='OTHER' ? 'Other' : code,
+  name: sp ? sp.name : code==='IND' ? 'Independent candidates' : (m ? m[1] : 'Unknown party'),
+  c: sp ? sp.c : code==='IND' ? '#6B6F7A' : (m ? m[2] : '#9A9AA5')};
+}
+const chip = (id, extra='') => { const p=rp(id); return `<span class="pchip" title="${esc(p.name)}"><span class="pdot" style="--c:${p.c}"></span>${esc(p.abbr)}${extra}</span>`; };
+const pct = (a,b) => b ? (a/b*100) : 0;
+const fmt = n => Number(n||0).toLocaleString('en-ZA');
+const tm = iso => { if(!iso) return '—'; const d=new Date(iso); return isNaN(d) ? '—' : d.toLocaleString('en-ZA',{weekday:'short',hour:'2-digit',minute:'2-digit'}); };
+const muniName = code => { const m=MUNIS.find(x=>x.code===code); return m ? m.name : (R.data.munis[code]||{}).name || code; };
+const isMetro = code => METRO_ORDER.includes(code);
+
+function councilStatus(m){
+ const total = m.prog.seats[1], need = Math.floor(total/2)+1;
+ const res = m.res||[], complete = total>0 && m.prog.seats[0]>=total;
+ const byVotes = res.slice().sort((a,b)=>b[1]-a[1]);
+ const lead = res[0] && res[0][5]>0 ? res[0] : byVotes[0];
+ if(!lead || !lead[1]) return {k:'wait', text:'Awaiting results', need, total, lead:null};
+ const p = rp(lead[0]);
+ if(complete) return (lead[7] || lead[5]>=need)
+  ? {k:'won', lead:lead[0], seats:lead[5], need, total, text:`${p.abbr} wins outright`}
+  : {k:'hung', lead:lead[0], seats:lead[5], need, total, text:`Hung: ${p.abbr} largest`};
+ return {k:'lead', lead:lead[0], seats:lead[5], need, total, text:`${p.abbr} leading`, vpct:lead[2]};
+}
+const statusPill = s => `<span class="status ${s.k}">${esc(s.text)}</span>`;
+
+function wardTally(codes){
+ const t=new Map(); let total=0, declared=0, leading=0;
+ codes.forEach(c=>{ const m=R.data.munis[c]; if(!m) return; total+=m.prog.wards[1];
+  Object.values(m.wards).forEach(([pid,,won])=>{ const o=t.get(pid)||{won:0,lead:0}; won?(o.won++,declared++):(o.lead++,leading++); t.set(pid,o); }); });
+ return {total, declared, leading, list:[...t].map(([id,o])=>[id,o.won+o.lead,o]).sort((a,b)=>b[1]-a[1])};
+}
+function councilTally(codes){
+ const t=new Map(); let hung=0, wait=0, counting=0;
+ codes.forEach(c=>{ const m=R.data.munis[c]; if(!m) return; const s=councilStatus(m);
+  if(s.k==='won') t.set(s.lead,(t.get(s.lead)||0)+1); else if(s.k==='hung') hung++; else if(s.k==='wait') wait++; else counting++; });
+ return {hung, wait, counting, list:[...t].sort((a,b)=>b[1]-a[1])};
+}
+function stack(list, total, cls=''){
+ const sum=list.reduce((a,x)=>a+x[1],0);
+ const label=list.map(([id,n])=>rp(id).abbr+' '+n).join(', ')+(total>sum?`, ${total-sum} not yet in`:'');
+ return `<span class="stack ${cls}" role="img" aria-label="${esc(label)}">${list.map(([id,n])=>{const p=rp(id);return `<i style="width:${pct(n,total).toFixed(2)}%;background:${p.c}" title="${esc(p.abbr)}: ${n}"></i>`}).join('')}</span>`;
+}
+function wardLine(w, max=4){
+ if(!w.list.length) return `<span class="src">No wards declared yet (${fmt(w.total)} in total)</span>`;
+ return `<div class="tally">${w.list.slice(0,max).map(([id,n])=>`<span>${chip(id)} <b>${fmt(n)}</b></span>`).join('')}${w.list.length>max?`<span>+${w.list.length-max} more</span>`:''}<span>of ${fmt(w.total)} wards</span></div>`;
+}
+function councilLine(c){
+ const parts=c.list.slice(0,4).map(([id,n])=>`<span>${chip(id)} <b>${n}</b></span>`);
+ if(c.hung) parts.push(`<span><b>${c.hung}</b> hung</span>`);
+ if(c.counting) parts.push(`<span><b>${c.counting}</b> still counting</span>`);
+ if(c.wait) parts.push(`<span><b>${c.wait}</b> awaiting results</span>`);
+ return `<div class="tally">${parts.join('')}</div>`;
+}
+function seatBar(m){
+ const s=councilStatus(m), seated=(m.res||[]).filter(r=>r[5]>0);
+ if(!seated.length) return `<span class="src">Seats are shared out when counting ends (${s.total} seats; ${s.need} for a majority)</span>`;
+ const bar = stack(seated.map(r=>[r[0],r[5]]), s.total).replace(/<\/span>$/, `<b class="maj" style="left:${pct(s.need,s.total).toFixed(2)}%" aria-hidden="true"></b></span>`);
+ return `<div>${bar}</div><div class="tally">${seated.slice(0,3).map(r=>`<span>${chip(r[0])} <b>${r[5]}</b></span>`).join('')}<span>${s.need} of ${s.total} for a majority</span></div>`;
+}
+function votesLeader(res){ const r=(res||[]).slice().sort((a,b)=>b[1]-a[1])[0]; return r&&r[1]?r:null; }
+
+/* ---------- views ---------- */
+function resHeader(){
+ const d=R.data, p=d.prog, final=p.vd[1]>0 && p.vd[0]>=p.vd[1], t=d.turnout;
+ const ago=Math.round((Date.now()-Date.parse(d.fetched))/60000);
+ return `${d.year!=='2026'?`<div class="notice res-test"><b>Test data.</b> This shows the ${esc(d.year)} results, not 2026.</div>`:''}
+ <div class="res-meta"><span><span class="live-dot ${final?'final':''}" aria-hidden="true"></span><b>${final?'Final results':p.vd[0]?'Counting in progress':'Waiting for the first results'}</b></span>
+  <span>IEC update: ${tm(d.report)}</span><span>Copied ${ago<1?'just now':ago+' min ago'}</span>
+  <button class="btn ghost small" id="resRefresh">Refresh</button>
+  <a href="${IEC_DASH}" target="_blank" rel="noopener">Official IEC dashboard</a></div>
+ <div class="prog-grid">
+  <div class="tile"><div class="k">Votes counted</div><div class="v">${pct(p.vd[0],p.vd[1]).toFixed(1)}%</div><span class="bar"><i style="width:${pct(p.vd[0],p.vd[1])}%"></i></span><div class="s">${fmt(p.vd[0])} of ${fmt(p.vd[1])} voting districts</div></div>
+  <div class="tile"><div class="k">Wards declared</div><div class="v">${fmt(p.wards[0])}</div><span class="bar"><i style="width:${pct(p.wards[0],p.wards[1])}%"></i></span><div class="s">of ${fmt(p.wards[1])} wards</div></div>
+  <div class="tile"><div class="k">Councils complete</div><div class="v">${fmt(p.munis[0])}</div><span class="bar"><i style="width:${pct(p.munis[0],p.munis[1])}%"></i></span><div class="s">of ${fmt(p.munis[1])}; ${p.hung} hung so far</div></div>
+  <div class="tile"><div class="k">Seats allocated</div><div class="v">${fmt(p.seats[0])}</div><span class="bar"><i style="width:${pct(p.seats[0],p.seats[1])}%"></i></span><div class="s">of ${fmt(p.seats[1])} council seats; ${fmt(t.reg)} registered voters</div></div>
+ </div>
+ <div class="seg res-seg" role="group" aria-label="Results view">${[['overview','Overview'],['provinces','Provinces'],['metros','Metros'],['districts','Districts'],['wards','Wards']].map(([k,l])=>`<button aria-pressed="${R.view===k}" data-rview="${k}">${l}</button>`).join('')}</div>`;
+}
+
+function viewOverview(){
+ const d=R.data, all=Object.keys(d.munis), w=wardTally(all), c=councilTally(all);
+ const wmap=new Map(w.list.map(x=>[x[0],x[2]])), cmap=new Map(c.list);
+ const rows=d.nat.filter(r=>r[1]>0||wmap.has(r[0])).sort((a,b)=>(a[0]===-2)-(b[0]===-2)||b[1]-a[1]);
+ const top=rows.slice(0,12);
+ const yours=store.get('place',null), ym=yours&&MUNIS[yours.m], yd=ym&&d.munis[ym.code];
+ return `${yd?`<div class="notice" style="max-width:none"><b>Your council, ${esc(ym.name)}:</b> ${statusPill(councilStatus(yd))} ${pct(yd.prog.vd[0],yd.prog.vd[1]).toFixed(0)}% counted. <button class="plink" data-rmuni="${ym.code}">See its wards</button></div>`:''}
+ <h3>Who is ahead nationally</h3>
+ ${rows.length?`<div class="cmp-scroll"><table class="nt"><thead><tr><th scope="col">Party</th><th scope="col">Share of the vote</th><th scope="col">Wards won</th><th scope="col">Councils won outright</th></tr></thead><tbody>
+ ${top.map(r=>{const p=rp(r[0]), ww=wmap.get(r[0]);return `<tr><td>${chip(r[0])}<span class="pname">${esc(p.name)}</span></td>
+  <td class="num"><span class="vbar"><i style="width:${Math.min(100,r[2])}%;background:${p.c}"></i></span> <b>${r[2].toFixed(1)}%</b> <span class="src">${fmt(r[1])}</span></td>
+  <td class="num"><b>${ww?fmt(ww.won):0}</b>${ww&&ww.lead?` <span class="src">+${ww.lead} leading</span>`:''}</td>
+  <td class="num"><b>${cmap.get(r[0])||0}</b></td></tr>`}).join('')}
+ </tbody></table></div>${rows.length>top.length?`<p class="src">${rows.length-top.length} smaller parties and independents not shown.</p>`:''}`
+ :`<div class="empty"><p>No votes have been counted yet.</p><p class="src">Results come in district by district through the night. This page checks for new figures every minute.</p></div>`}
+ <div class="two" style="margin-top:28px">
+  <div class="card"><h3>Metros</h3><ul class="mini">${METRO_ORDER.filter(k=>d.munis[k]).map(k=>{const m=d.munis[k],s=councilStatus(m);return `<li><button data-rmetro="${k}"><span class="nm">${esc(muniName(k))}</span>${statusPill(s)}<span class="stack thin" style="grid-column:1/-1">${(m.res||[]).filter(r=>r[1]).sort((a,b)=>b[1]-a[1]).map(r=>`<i style="width:${r[2]}%;background:${rp(r[0]).c}"></i>`).join('')}</span></button></li>`}).join('')}</ul></div>
+  <div class="card"><h3>Provinces</h3><ul class="mini">${d.prov.map(p=>{const l=votesLeader(p.res), wt=wardTally(p.munis);return `<li><button data-rprov="${p.code}"><span class="nm">${esc(PROV[p.code])}</span><span>${l?chip(l[0],` ${l[2].toFixed(0)}%`):'<span class="src">No results</span>'}</span>${stack(wt.list.map(x=>[x[0],x[1]]),wt.total,'thin')}</button></li>`}).join('')}</ul></div>
+ </div>
+ <p class="src" style="margin-top:14px">Bars under each province show wards won or leading. "Share of the vote" is the party (PR) ballot across all councils.</p>`;
+}
+
+function councilTable(codes){
+ const d=R.data; codes=codes.filter(c=>d.munis[c]);
+ if(!codes.length) return `<div class="empty"><p>No councils reported yet.</p></div>`;
+ return `<div class="cmp-scroll"><table class="ct"><thead><tr><th scope="col">Council</th><th scope="col">Result</th><th scope="col">Seats</th><th scope="col">Wards</th><th scope="col">Counted</th></tr></thead><tbody>
+ ${codes.map(code=>{const m=d.munis[code], s=councilStatus(m), w=wardTally([code]), meta=MUNIS.find(x=>x.code===code);
+  return `<tr><th scope="row"><button class="plink" data-rmuni="${code}">${esc(muniName(code))}</button><span class="pname" style="margin-left:0">${isMetro(code)?'Metro':esc(meta&&meta.district?meta.district+' District':code)}</span></th>
+  <td>${statusPill(s)}${s.vpct?`<div class="src">${s.vpct.toFixed(1)}% of the vote</div>`:''}</td>
+  <td style="min-width:200px">${seatBar(m)}</td>
+  <td style="min-width:160px">${stack(w.list.map(x=>[x[0],x[1]]),w.total,'thin')}<div class="tally">${w.list.slice(0,2).map(([id,n])=>`<span>${chip(id)} <b>${n}</b></span>`).join('')}<span>of ${w.total}</span></div></td>
+  <td class="num">${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}%</td></tr>`}).join('')}
+ </tbody></table></div>`;
+}
+
+function viewProvinces(){
+ const d=R.data;
+ if(R.prov){
+  const p=d.prov.find(x=>x.code===R.prov); if(!p){R.prov=null;return viewProvinces()}
+  const l=votesLeader(p.res), codes=p.munis.slice().sort((a,b)=>(isMetro(b)-isMetro(a))||muniName(a).localeCompare(muniName(b)));
+  return `<nav class="crumbs" aria-label="Breadcrumb"><button data-rprov="">All provinces</button><span aria-hidden="true">›</span><b>${esc(PROV[p.code])}</b></nav>
+  <div class="rcard" style="margin-bottom:20px"><h3>${esc(PROV[p.code])}<small>${p.prog?pct(p.prog.vd[0],p.prog.vd[1]).toFixed(0)+'% counted':''}</small></h3>
+   <div><div class="lbl">Most votes</div><div class="big">${l?chip(l[0],` ${l[2].toFixed(1)}%`):'<span class="src">No results yet</span>'}</div></div>
+   <div><div class="lbl">Wards won or leading</div>${stack(wardTally(p.munis).list.map(x=>[x[0],x[1]]),wardTally(p.munis).total)}${wardLine(wardTally(p.munis),6)}</div>
+   <div><div class="lbl">Councils</div>${councilLine(councilTally(p.munis))}</div></div>
+  <h3>Every council in ${esc(PROV[p.code])}</h3>${councilTable(codes)}`;
+ }
+ return `<div class="rgrid">${d.prov.map(p=>{const l=votesLeader(p.res), w=wardTally(p.munis), c=councilTally(p.munis);
+  return `<section class="rcard"><h3>${esc(PROV[p.code])}<small>${p.prog?pct(p.prog.vd[0],p.prog.vd[1]).toFixed(0)+'% counted':'No results yet'}</small></h3>
+  <div><div class="lbl">Most votes</div><div class="big">${l?chip(l[0],` ${l[2].toFixed(1)}%`):'<span class="src">Waiting</span>'}</div></div>
+  <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3)}</div>
+  <div><div class="lbl">Councils won outright</div>${councilLine(c)}</div>
+  <button class="btn ghost small" data-rprov="${p.code}">See ${p.munis.length} councils</button></section>`}).join('')}</div>`;
+}
+
+function viewMetros(){
+ const d=R.data;
+ return `<p class="intro">A metro council needs more than half its seats to govern alone. Otherwise parties must form a coalition, and the council elects the mayor.</p>
+ <div class="rgrid">${METRO_ORDER.filter(k=>d.munis[k]).map(k=>{const m=d.munis[k], s=councilStatus(m), w=wardTally([k]);
+  const top=(m.res||[]).filter(r=>r[1]).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  return `<section class="rcard" id="metro-${k}"><h3>${esc(muniName(k))}<small>${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted</small></h3>
+  <div class="big">${s.lead!=null?chip(s.lead):''} ${statusPill(s)}</div>
+  <div><div class="lbl">Seats</div>${seatBar(m)}</div>
+  <div><div class="lbl">Party vote</div>${top.length?`<ul class="mini">${top.map(r=>`<li style="display:flex;justify-content:space-between;padding:6px 0">${chip(r[0])}<span class="num">${r[2].toFixed(1)}%${r[5]?` · ${r[5]} seats`:''}</span></li>`).join('')}</ul>`:'<span class="src">No votes counted yet</span>'}</div>
+  <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3)}</div>
+  <button class="btn ghost small" data-rmuni="${k}">See all ${w.total} wards</button></section>`}).join('')}</div>`;
+}
+
+function districtsList(){
+ const g=new Map();
+ MUNIS.filter(m=>m.district && R.data.munis[m.code]).forEach(m=>{const k=m.prov+'|'+m.district; if(!g.has(k)) g.set(k,{prov:m.prov,name:m.district,codes:[]}); g.get(k).codes.push(m.code)});
+ return [...g.values()].sort((a,b)=>PROV[a.prov].localeCompare(PROV[b.prov])||a.name.localeCompare(b.name));
+}
+function viewDistricts(){
+ const ds=districtsList();
+ if(R.dist){
+  const dd=ds.find(x=>x.prov+'|'+x.name===R.dist); if(!dd){R.dist=null;return viewDistricts()}
+  const w=wardTally(dd.codes);
+  return `<nav class="crumbs" aria-label="Breadcrumb"><button data-rdist="">All districts</button><span aria-hidden="true">›</span><span>${esc(PROV[dd.prov])}</span><span aria-hidden="true">›</span><b>${esc(dd.name)}</b></nav>
+  <div class="rcard" style="margin-bottom:20px"><h3>${esc(dd.name)} District<small>${dd.codes.length} local councils</small></h3>
+   <div><div class="lbl">Wards won or leading</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,6)}</div>
+   <div><div class="lbl">Local councils won outright</div>${councilLine(councilTally(dd.codes))}</div></div>
+  ${councilTable(dd.codes)}`;
+ }
+ const provs=[...new Set(ds.map(x=>x.prov))];
+ const f=store.get('rDistProv','');
+ return `<p class="intro">Districts group the local councils outside the metros. The IEC dashboard feed doesn't publish district councils' own seat results, so these figures add up the wards and councils of each district's local municipalities.</p>
+ <div class="pchips" role="group" aria-label="Filter by province"><button aria-pressed="${!f}" data-rdprov="">All</button>${provs.map(p=>`<button aria-pressed="${f===p}" data-rdprov="${p}">${esc(PROV[p])}</button>`).join('')}</div>
+ <div class="rgrid">${ds.filter(x=>!f||x.prov===f).map(dd=>{const w=wardTally(dd.codes);
+  return `<section class="rcard"><h3>${esc(dd.name)}<small>${esc(PROV[dd.prov])}</small></h3>
+  <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3)}</div>
+  <div><div class="lbl">Councils won outright</div>${councilLine(councilTally(dd.codes))}</div>
+  <button class="btn ghost small" data-rdist="${esc(dd.prov+'|'+dd.name)}">See ${dd.codes.length} councils</button></section>`}).join('')}</div>`;
+}
+
+function winnerCandidate(code, wardNo, pid){
+ if(!R.data || R.data.year!=='2026') return null;
+ wardData(); const m=WBY[code], w=m&&m[3].find(x=>x[0]===wardNo); if(!w) return null;
+ const iec=rp(pid).code;
+ if(iec==='IND'){ const inds=w[4].filter(c=>c[0]<0); return inds.length===1?inds[0]:null; }
+ const want=norm(IEC2CAND[iec]||iec).replace(/ /g,'');
+ return w[4].find(c=>c[0]>=0 && norm(WD.p[c[0]][0]).replace(/ /g,'')===want)||null;
+}
+function viewWards(){
+ const d=R.data;
+ if(!R.muni){ const y=store.get('place',null); if(y&&MUNIS[y.m]&&d.munis[MUNIS[y.m].code]) R.muni=MUNIS[y.m].code; }
+ const picker=`<div class="combo"><label class="sr" for="rq">Municipality, town or suburb</label>
+  <input id="rq" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugg3" autocomplete="off" spellcheck="false" placeholder="Find a council, town or suburb, e.g. Soweto" value="${R.muni?esc(muniName(R.muni)):''}">
+  <ul id="sugg3" role="listbox" aria-label="Matching places" hidden></ul></div>`;
+ const m=R.muni&&d.munis[R.muni];
+ if(!m) return picker+`<div class="empty"><p>Choose a council to see who is winning each ward.</p><p class="src">Or start with a metro: ${METRO_ORDER.map(k=>`<button class="plink" data-rmuni="${k}">${esc(muniName(k))}</button>`).join(', ')}.</p></div>`;
+ const n=m.prog.wards[1]; let nums=wardsOf(R.muni); if(!nums.length||nums.length!==n) nums=Array.from({length:n},(_,i)=>i+1);
+ Object.keys(m.wards).forEach(k=>{if(!nums.includes(+k)) nums.push(+k)}); nums.sort((a,b)=>a-b);
+ const w=wardTally([R.muni]), s=councilStatus(m), meta=MUNIS.find(x=>x.code===R.muni);
+ let detail='';
+ if(R.ward!=null){
+  const wr=m.wards[R.ward];
+  if(wr){ const p=rp(wr[0]), c=winnerCandidate(R.muni,R.ward,wr[0]);
+   detail=`<div class="wdetail" style="--c:${p.c}" aria-live="polite"><h3>Ward ${R.ward}, ${esc(muniName(R.muni))}</h3>
+    <p><b>${esc(p.name)}</b> ${wr[2]?'won':'is leading'} with <b>${wr[1].toFixed(1)}%</b> of the ward vote.${wr[2]?'':' Counting is still under way here.'}</p>
+    ${c?`<p>Candidate: <b>${esc(tcase(c[2]))} ${esc(tcase(c[1]))}</b>${c[3]?`, ${c[3]}`:''}</p>`:''}
+    <p>${R.data.year==='2026'&&WBY[R.muni]?`<button class="plink" data-rcands="${R.ward}">See every candidate in this ward</button>`:''}${p.site?` · <button class="plink" data-goparty="${p.site.id}">About the ${esc(p.abbr)}</button>`:''}</p></div>`;
+  } else detail=`<div class="wdetail" style="--c:var(--line)"><h3>Ward ${R.ward}, ${esc(muniName(R.muni))}</h3><p>No result for this ward yet.</p></div>`;
+ }
+ return picker+`<div class="rcard" style="margin-bottom:18px"><h3>${esc(muniName(R.muni))}<small>${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted</small></h3>
+  <p class="place-meta" style="margin:0">${statusPill(s)} <span class="tag">${isMetro(R.muni)?'Metro':'Local council'}</span>${meta&&meta.district?`<span class="tag">${esc(meta.district)} District</span>`:''}<span class="tag">${esc(PROV[m.prov])}</span></p>
+  <div><div class="lbl">Council seats</div>${seatBar(m)}</div></div>
+  <h3>Who is winning each ward</h3>
+  <div class="key"><span>Solid top edge: won</span><span>Dashed: leading, still counting</span><span>Tap a ward for details. Tap a party to highlight its wards.</span></div>
+  <div class="pchips" role="group" aria-label="Highlight a party">${w.list.map(([id,cnt,o])=>`<button aria-pressed="${R.hl===id}" data-rhl="${id}">${chip(id)} <b>${cnt}</b>${o.lead?` <span class="src">(${o.lead} leading)</span>`:''}</button>`).join('')}${w.total>w.declared+w.leading?`<span class="src" style="align-self:center">${w.total-w.declared-w.leading} wards not in yet</span>`:''}</div>
+  ${detail}
+  <div class="wgrid" role="group" aria-label="Wards">${nums.map(k=>{const wr=m.wards[k], p=wr?rp(wr[0]):null;
+   return `<button class="wt2 ${!wr?'none':wr[2]?'':'lead'} ${R.hl!=null&&(!wr||wr[0]!==R.hl)?'dim':''}" style="--c:${p?p.c:'var(--line)'}" aria-pressed="${R.ward===k}" data-rward="${k}" aria-label="Ward ${k}: ${wr?esc(p.abbr)+(wr[2]?' won':' leading')+' '+wr[1].toFixed(0)+'%':'no result yet'}"><b>${k}</b><span>${wr?esc(p.abbr):'—'}</span></button>`}).join('')}</div>`;
+}
+
+function renderResults(){
+ const s=document.getElementById('s-results'); if(!s) return;
+ const head=`<h2 id="h-results">Live results: 2026 local elections</h2>`;
+ if(!R.data){
+  s.innerHTML = head+(R.loadedAt===0?`<p class="intro">Loading the latest results…</p>`
+   :`<div class="notice">Live results will appear here as the IEC publishes them. Voting closed at 21:00 on 4 November; councils usually start declaring within a few hours. Meanwhile, the <a href="${IEC_DASH}" target="_blank" rel="noopener">official IEC results dashboard</a> has the same figures.</div>`);
+  return;
+ }
+ const views={overview:viewOverview,provinces:viewProvinces,metros:viewMetros,districts:viewDistricts,wards:viewWards};
+ if(!views[R.view]) R.view='overview';
+ const keepFocus = document.activeElement && document.activeElement.closest && document.activeElement.closest('#s-results') ? document.activeElement : null;
+ const sel = keepFocus && ['rview','rward','rhl','rdprov'].map(k=>keepFocus.dataset[k]!==undefined?`[data-${k}="${keepFocus.dataset[k]}"]`:null).find(Boolean);
+ const typing = keepFocus && keepFocus.id==='rq';
+ if(typing) return; // don't redraw under someone typing in the council search
+ s.innerHTML = head+resHeader()+`<div id="resBody">${views[R.view]()}</div>`+
+  `<p class="src" style="margin-top:22px">Source: Electoral Commission of South Africa results feed, copied here every few minutes. Figures can change until the IEC declares each council. Ward candidate names come from the IEC's certified list; check the <a href="${IEC_DASH}" target="_blank" rel="noopener">IEC dashboard</a> for official results.</p>`;
+ if(sel){ const el=s.querySelector(sel); el&&el.focus({preventScroll:true}); }
+ if(R.view==='wards' && document.getElementById('rq')) wireCombo('rq','sugg3',(label,m)=>{ if(!R.data.munis[m.code]) return; document.getElementById('rq').blur(); setRes({muni:m.code, ward:null, hl:null}); });
+}
+document.getElementById('s-results').addEventListener('click',e=>{
+ const t=e.target.closest('button'); if(!t) return; const ds=t.dataset;
+ if(t.id==='resRefresh'){ t.textContent='Checking…'; loadResults(); return; }
+ if(ds.rview!==undefined) return setRes({view:ds.rview});
+ if(ds.rprov!==undefined) return setRes({view:'provinces', prov:ds.rprov||null});
+ if(ds.rdist!==undefined) return setRes({view:'districts', dist:ds.rdist||null});
+ if(ds.rdprov!==undefined){ store.set('rDistProv',ds.rdprov); return renderResults(); }
+ if(ds.rmetro!==undefined){ setRes({view:'metros'}); const el=document.getElementById('metro-'+ds.rmetro); el&&el.scrollIntoView({block:'start',behavior:'smooth'}); return; }
+ if(ds.rmuni!==undefined){ setRes({view:'wards', muni:ds.rmuni, ward:null, hl:null}); document.getElementById('h-results').scrollIntoView({behavior:'smooth'}); return; }
+ if(ds.rward!==undefined){ const k=+ds.rward; return setRes({ward:R.ward===k?null:k}); }
+ if(ds.rhl!==undefined){ const k=+ds.rhl; return setRes({hl:R.hl===k?null:k}); }
+ if(ds.rcands!==undefined){ candState.view='wards'; candState.code=R.muni; candState.label=muniName(R.muni); candState.ward=+ds.rcands; saveCand(); renderCands(); showTab('cands'); }
+});
+
 /* ============ THEME ============ */
 document.getElementById('themeBtn').onclick=()=>{
  const r=document.documentElement; const dark = r.dataset.theme ? r.dataset.theme==='dark' : matchMedia('(prefers-color-scheme: dark)').matches;
@@ -1224,8 +1579,12 @@ document.getElementById('themeBtn').onclick=()=>{
 };
 (()=>{const t=store.get('theme',null); if(t) document.documentElement.dataset.theme=t})();
 
-function renderAll(){renderParties();renderCompare();renderPresets();renderSliders();renderRank();renderPeople();renderHow();if(state.mode==='local')renderCands()}
+function renderAll(){renderResults();renderParties();renderCompare();renderPresets();renderSliders();renderRank();renderPeople();renderHow();if(state.mode==='local')renderCands()}
 applyMode();
+if(Date.now()>=POLLS_CLOSE) showTab('results');
+loadResults();
+setInterval(()=>{ if(document.visibilityState==='visible') loadResults(); }, 60000);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && Date.now()-R.loadedAt>60000) loadResults(); });
 </script>
 </body>
 </html>

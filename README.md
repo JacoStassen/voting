@@ -31,3 +31,12 @@ In the ward ballot you choose a person, not only a party. Proverbs 18:17 says th
 **Independence.** This guide is not affiliated with any party, church or the Electoral Commission. Party details come from manifestos, launch speeches and reporting by the IEC, Africa Check, Daily Maverick, TimesLIVE, News24, SABC, EWN and others, as of 7 October 2026. Positions change during a campaign; check the linked sources and the [IEC](https://www.elections.org.za/pw/) before you vote.
 
 Official help: IEC contact centre 0800 11 8000. Voting stations open 07:00 to 21:00 on 4 November 2026.
+## Live results
+
+The **Live results** tab shows the 2026 count by province, metro, district, council and ward.
+
+The IEC's results feed (`results.elections.org.za/dashboards/lge/MapsJason/…`) can't be read by browsers on other sites (it sends no CORS headers). So the `Live results relay` GitHub Action runs `scripts/fetch_results.py` every 5 minutes. It condenses the national and nine provincial feeds into `results/live.json` (about 150 KB when complete) and commits that file. The page fetches it from its own origin once a minute.
+
+- Run the relay by hand from the Actions tab (**Run workflow**), or locally with `python3 scripts/fetch_results.py`.
+- Test with full 2021 results: `python3 scripts/fetch_results.py --event 1091 --year 2021`. The page shows a "Test data" banner. Run it again without arguments afterwards so you don't commit 2021 data.
+- District figures add up each district's local councils, because the feed doesn't publish district councils' own results.

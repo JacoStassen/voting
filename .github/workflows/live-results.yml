@@ -1,0 +1,44 @@
+name: Live results relay
+
+# Copies the IEC's 2026 local-election results into results/live.json so the site can
+# read them from its own origin (the IEC feed blocks cross-site browser reads).
+# GitHub runs scheduled jobs at most every 5 minutes, and often a few minutes late.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: live-results
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch IEC results
+        run: python3 scripts/fetch_results.py
+      - name: Commit if changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- results/live.json && git ls-files --error-unmatch results/live.json >/dev/null 2>&1; then
+            echo "No change"; exit 0
+          fi
+          git config user.name "results-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add results/live.json
+          git commit -m "Update live results"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push
+          # Pushes made with the workflow token don't always trigger a Pages build, so ask for one.
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/dev/null || true
