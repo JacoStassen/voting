@@ -27,7 +27,8 @@ METRO_PREFIX = {"CPT": "19100", "BUF": "29200", "NMA": "29300", "MAN": "49400",
 def get_json(url, tries=3):
     for i in range(tries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json, text/javascript, */*; q=0.01",
+                                                      "Referer": "https://results.elections.org.za/dashboards/lge/"})
             with urllib.request.urlopen(req, timeout=60) as r:
                 raw = r.read().decode("utf-8-sig")
             return json.loads(raw)
@@ -96,6 +97,14 @@ def main():
     plist = get_json(f"{BASE}/2016/PartyList.js") or []
     pmeta = {p["ID"]: p for p in plist}
 
+    out = os.path.abspath(a.out)
+    try:
+        prev = json.load(open(out))
+        if prev.get("event") != a.event:
+            prev = None
+    except (OSError, ValueError):
+        prev = None
+
     used = set()
     data = {
         "v": 1, "event": a.event, "year": a.year,
@@ -107,11 +116,23 @@ def main():
     }
 
     prefix_to_code = {}
+    failed = []
     for pid in range(1, 10):
         p = get_json(f"{base}Province{pid}.js")
         key = IEC_PROV[pid]
         if not p:
-            data["prov"].append({"id": pid, "code": key, "prog": None, "res": [], "munis": []})
+            # Keep the last good copy of this province rather than wiping it.
+            old = next((x for x in (prev or {}).get("prov", []) if x.get("id") == pid), None)
+            if old:
+                data["prov"].append(old)
+                for code in old.get("munis", []):
+                    if code in prev["munis"]:
+                        data["munis"][code] = prev["munis"][code]
+                        used.update(r[0] for r in prev["munis"][code]["res"])
+                        used.update(w[0] for w in prev["munis"][code]["wards"].values())
+                failed.append(key)
+            else:
+                data["prov"].append({"id": pid, "code": key, "prog": None, "res": [], "munis": []})
             continue
         codes = []
         all_wards = []
@@ -144,8 +165,12 @@ def main():
 
     data["parties"] = {str(i): [pmeta[i]["Name"], pmeta[i]["PartyFullName"].title(), pmeta[i]["sWebColour"]]
                        for i in sorted(used) if i in pmeta}
+    for k, v in ((prev or {}).get("parties") or {}).items():
+        if int(k) in used:
+            data["parties"].setdefault(k, v)
 
-    out = os.path.abspath(a.out)
+    if failed:
+        print(f"warn: kept previous data for {', '.join(failed)}", file=sys.stderr)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     # Skip rewriting when nothing but the fetch time changed, so we don't commit noise.
     try:
