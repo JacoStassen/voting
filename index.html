@@ -322,6 +322,27 @@ table.nt td.num,table.ct td.num{font-variant-numeric:tabular-nums;white-space:no
 .feed li:first-child{border-top:0}
 .feed time{color:var(--muted);font-variant-numeric:tabular-nums;min-width:3.4em;flex:none}
 .feed li.big span{font-weight:700}
+.wonbtn{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-decoration:underline;text-decoration-color:var(--violet);text-underline-offset:3px}
+.wonbtn:hover b,.wonbtn:focus-visible b{color:var(--violet)}
+.tally .wonbtn{text-decoration:none;display:inline-flex;align-items:center;gap:4px;border-bottom:1px dotted var(--muted)}
+.dlg{width:min(760px,calc(100% - 24px));max-height:min(88vh,900px);padding:0;border:2px solid var(--ink);border-radius:10px;background:var(--sheet);color:var(--ink)}
+.dlg::backdrop{background:rgba(10,10,20,.55)}
+.dlg-head{position:sticky;top:0;z-index:2;background:var(--sheet);border-bottom:1px solid var(--line);padding:16px 20px 12px}
+.dlg-head h2{margin:0 40px 10px 0;font-size:1.35rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dlg-x{position:absolute;top:12px;right:12px;width:36px;height:36px;border:1px solid var(--line);border-radius:50%;background:var(--paper);color:var(--ink);font-size:1.3rem;line-height:1;cursor:pointer}
+.dlg-body{padding:6px 20px 22px}
+.dlg .seg{margin:0 0 10px}
+.dlg .pchips{margin:0}
+.dlg-prov{display:flex;align-items:center;gap:8px;font-size:.9rem;font-weight:700}
+.dlg-prov select{font:inherit;font-weight:400;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
+.dlg h3{margin:20px 0 6px;font-size:1.05rem;border-bottom:2px solid var(--ink);padding-bottom:4px}
+.dlg h4{margin:12px 0 4px;font-size:.88rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.wonrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.wonrow:first-of-type{border-top:0}
+.wonrow .src{font-size:.85rem}
+.wonrow .wchips{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:5px}
+.wchip{min-width:40px;padding:3px 7px;border:1px solid var(--line);border-top:4px solid var(--c);border-radius:5px;background:var(--paper);color:var(--ink);font-size:.85rem;font-variant-numeric:tabular-nums;cursor:pointer}
+.wchip.lead{border-top-style:dashed}
 .theme-btn{border:1px solid var(--line);background:var(--sheet);color:var(--ink);font-weight:700;border-radius:99px;padding:8px 16px;cursor:pointer}
 
 @media (max-width:760px){
@@ -1349,6 +1370,7 @@ async function loadResults(){
   if(!got) throw last;
   R.data = got; R.err = null;
   try{ updateFeed(got); }catch(e){}
+  const dl=document.getElementById('wonDlg'); if(dl && dl.open) renderWon(false);
  }catch(e){ R.err = e; }
  R.loadedAt = Date.now(); R.busy=false;
  const pill=document.getElementById('livePill');
@@ -1405,12 +1427,13 @@ function stack(list, total, cls=''){
  const label=list.map(([id,n])=>rp(id).abbr+' '+n).join(', ')+(total>sum?`, ${total-sum} not yet in`:'');
  return `<span class="stack ${cls}" role="img" aria-label="${esc(label)}">${list.map(([id,n])=>{const p=rp(id);return `<i style="width:${pct(n,total).toFixed(2)}%;background:${p.c}" title="${esc(p.abbr)}: ${n}"></i>`}).join('')}</span>`;
 }
-function wardLine(w, max=4){
+const wonBtn = (pid, kind, scope, inner, label) => `<button class="wonbtn" data-rwon="${pid}" data-rwk="${kind}" data-rscope="${esc(scope||'')}" aria-label="${esc(label)}">${inner}</button>`;
+function wardLine(w, max=4, scope=''){
  if(!w.list.length) return `<span class="src">No wards declared yet (${fmt(w.total)} in total)</span>`;
- return `<div class="tally">${w.list.slice(0,max).map(([id,n])=>`<span>${chip(id)} <b>${fmt(n)}</b></span>`).join('')}${w.list.length>max?`<span>+${w.list.length-max} more</span>`:''}<span>of ${fmt(w.total)} wards</span></div>`;
+ return `<div class="tally">${w.list.slice(0,max).map(([id,n])=>`<span>${wonBtn(id,'wards',scope,`${chip(id)} <b>${fmt(n)}</b>`,`Which wards ${rp(id).abbr} won or leads`)}</span>`).join('')}${w.list.length>max?`<span>+${w.list.length-max} more</span>`:''}<span>of ${fmt(w.total)} wards</span></div>`;
 }
-function councilLine(c){
- const parts=c.list.slice(0,4).map(([id,n])=>`<span>${chip(id)} <b>${n}</b></span>`);
+function councilLine(c, scope=''){
+ const parts=c.list.slice(0,4).map(([id,n])=>`<span>${wonBtn(id,'councils',scope,`${chip(id)} <b>${n}</b>`,`Which councils ${rp(id).abbr} won`)}</span>`);
  if(c.hung) parts.push(`<span><b>${c.hung}</b> hung</span>`);
  if(c.counting) parts.push(`<span><b>${c.counting}</b> still counting</span>`);
  if(c.wait) parts.push(`<span><b>${c.wait}</b> awaiting results</span>`);
@@ -1517,6 +1540,80 @@ function feedCard(){
   :`<p class="src" style="margin:0">Councils being declared and lead changes in the metros will appear here as new results come in. Keep this page open; it checks every minute.</p>`}</div>`;
 }
 
+/* ---------- "Which councils / wards?" dialog ---------- */
+const WON = {pid:null, kind:'councils', scope:'', prov:'', wk:'won'};
+function scopeCodes(scope){
+ const d=R.data, [t,v]=[scope.split(':')[0], scope.slice(scope.indexOf(':')+1)];
+ if(t==='prov'){ const p=d.prov.find(x=>x.code===v); return {codes:p?p.munis:[], label:PROV[v]||v}; }
+ if(t==='dist'){ const dd=districtsList().find(x=>x.prov+'|'+x.name===v); return {codes:dd?dd.codes:[], label:dd?dd.name+' District':v}; }
+ if(t==='muni') return {codes:d.munis[v]?[v]:[], label:muniName(v)};
+ return {codes:Object.keys(d.munis), label:'South Africa'};
+}
+const muniTag = code => { const meta=MUNIS.find(x=>x.code===code); return isMetro(code)?'Metro':meta&&meta.district?meta.district+' District':'Local council'; };
+function wonDialog(){
+ let dl=document.getElementById('wonDlg'); if(dl) return dl;
+ dl=document.createElement('dialog'); dl.id='wonDlg'; dl.className='dlg'; dl.setAttribute('aria-labelledby','wonTitle');
+ document.body.appendChild(dl);
+ dl.addEventListener('click',e=>{
+  if(e.target===dl){ dl.close(); return; } // click on the backdrop
+  const t=e.target.closest('button'); if(!t) return; const ds=t.dataset;
+  if(t.classList.contains('dlg-x')) return dl.close();
+  if(ds.wk) { WON.kind=ds.wk; return renderWon(true); }
+  if(ds.wwk) { WON.wk=ds.wwk; return renderWon(true); }
+  if(ds.wprov!==undefined) { WON.prov=ds.wprov; return renderWon(true); }
+  if(ds.wmuni!==undefined){ dl.close(); setRes({view:'wards', muni:ds.wmuni, ward:ds.wward?+ds.wward:null, hl:ds.wward?null:WON.pid}); document.getElementById('h-results').scrollIntoView({behavior:'smooth'}); }
+ });
+ return dl;
+}
+function openWon(pid, kind, scope){
+ Object.assign(WON,{pid, kind, scope:scope||'', prov:'', wk:null});
+ const dl=wonDialog(); renderWon(true); if(!dl.open) dl.showModal(); dl.scrollTop=0;
+}
+function renderWon(top){
+ const dl=document.getElementById('wonDlg'); if(!dl || !R.data) return;
+ const keep=top?0:dl.scrollTop, d=R.data, p=rp(WON.pid), sc=scopeCodes(WON.scope);
+ let codes=sc.codes; const provs=[...new Set(codes.map(c=>d.munis[c].prov))];
+ if(WON.prov) codes=codes.filter(c=>d.munis[c].prov===WON.prov);
+ const won=[], wards=new Map(); let nW=0, nL=0;
+ codes.forEach(c=>{ const m=d.munis[c], s=councilStatus(m);
+  if(s.k==='won' && s.lead===WON.pid) won.push([c,s]);
+  Object.entries(m.wards).forEach(([k,w])=>{ if(w[0]!==WON.pid) return; w[2]?nW++:nL++;
+   if(!wards.has(c)) wards.set(c,[]); wards.get(c).push([+k,w]); }); });
+ // Early in the count most wards are only "leading", so show both until some are won.
+ if(!WON.wk) WON.wk = nW ? 'won' : 'all';
+ wards.forEach((ws,c)=>{ const f=ws.filter(([,w])=>WON.wk==='all'||(WON.wk==='won')===!!w[2]); f.length?wards.set(c,f):wards.delete(c); });
+ // group council codes by province, metros first then by district and name
+ const group = list => { const g=new Map(); list.slice().sort((a,b)=>PROV[d.munis[a].prov].localeCompare(PROV[d.munis[b].prov])||(isMetro(b)-isMetro(a))||muniTag(a).localeCompare(muniTag(b))||muniName(a).localeCompare(muniName(b)))
+  .forEach(c=>{ const k=d.munis[c].prov; if(!g.has(k)) g.set(k,[]); g.get(k).push(c); }); return g; };
+ const where = sc.label==='South Africa' ? (WON.prov?PROV[WON.prov]:'South Africa') : sc.label;
+ let body='';
+ if(WON.kind==='councils'){
+  const g=group(won.map(x=>x[0])), st=new Map(won);
+  body = won.length ? [...g].map(([pv,cs])=>`<h3>${esc(PROV[pv])} <span class="src">(${cs.length})</span></h3>${cs.map(c=>{const s=st.get(c), m=d.munis[c];
+   return `<div class="wonrow"><div><button class="plink" data-wmuni="${c}">${esc(muniName(c))}</button><div class="src">${esc(muniTag(c))}</div></div>
+    <div class="num"><b>${s.seats}</b> of ${s.total} seats<div class="src">${(partyRows(m).find(r=>r[0]===WON.pid)||[0,0,0])[2].toFixed(1)}% of the vote</div></div></div>`}).join('')}`).join('')
+   : `<p class="empty">${esc(p.abbr)} hasn't won any council outright in ${esc(where)} yet. Councils are declared once every vote in them is counted.</p>`;
+ } else {
+  const g=group([...wards.keys()]);
+  const total=[...wards.values()].reduce((a,x)=>a+x.length,0);
+  body = `<div class="pchips" role="group" aria-label="Which wards" style="margin:12px 0 0">${[['won',`Won (${fmt(nW)})`],['lead',`Leading (${fmt(nL)})`],['all',`Both (${fmt(nW+nL)})`]].map(([k,l])=>`<button aria-pressed="${WON.wk===k}" data-wwk="${k}">${l}</button>`).join('')}</div>`
+  + (total ? [...g].map(([pv,cs])=>`<h3>${esc(PROV[pv])} <span class="src">(${fmt(cs.reduce((a,c)=>a+wards.get(c).length,0))} wards)</span></h3>${(()=>{let lastTag='';return cs.map(c=>{const ws=wards.get(c).sort((a,b)=>a[0]-b[0]), tag=muniTag(c);
+    const h=tag!==lastTag&&tag!=='Metro'?`<h4>${esc(tag)}</h4>`:''; lastTag=tag;
+    return h+`<div class="wonrow"><div><button class="plink" data-wmuni="${c}">${esc(muniName(c))}</button>${tag==='Metro'?' <span class="src">Metro</span>':''}</div><div class="src">${ws.length} of ${d.munis[c].prog.wards[1]} wards</div>
+     <div class="wchips">${ws.map(([k,w])=>`<button class="wchip ${w[2]?'':'lead'}" style="--c:${p.c}" data-wmuni="${c}" data-wward="${k}" title="Ward ${k}: ${w[1].toFixed(1)}%${w[2]?'':', still counting'}" aria-label="Ward ${k}, ${w[2]?'won':'leading'} with ${w[1].toFixed(0)}%">${k}</button>`).join('')}</div></div>`}).join('')})()}`).join('')
+   : `<p class="empty">No ${WON.wk==='lead'?'wards where '+esc(p.abbr)+' is leading':'wards '+esc(p.abbr)+(WON.wk==='won'?' has won':' has won or leads')} in ${esc(where)} yet.</p>`)
+  + `<p class="src" style="margin-top:16px">Solid top edge: won. Dashed: leading, still counting. Tap a ward to open it.</p>`;
+ }
+ const nC=won.length;
+ dl.innerHTML = `<div class="dlg-head"><button class="dlg-x" aria-label="Close">×</button>
+  <h2 id="wonTitle">${chip(WON.pid)} <span>in ${esc(where)}</span></h2>
+  <div class="seg" role="group" aria-label="Show"><button aria-pressed="${WON.kind==='councils'}" data-wk="councils">Councils won (${nC})</button><button aria-pressed="${WON.kind==='wards'}" data-wk="wards">Wards (${fmt(nW)} won, ${fmt(nL)} leading)</button></div>
+  ${!WON.scope && provs.length>1?`<label class="dlg-prov">Province <select id="wonProv"><option value="">All provinces</option>${provs.sort((a,b)=>PROV[a].localeCompare(PROV[b])).map(pv=>`<option value="${pv}" ${WON.prov===pv?'selected':''}>${esc(PROV[pv])}</option>`).join('')}</select></label>`:''}</div>
+  <div class="dlg-body">${body}</div>`;
+ dl.scrollTop=keep;
+ const sel=dl.querySelector('#wonProv'); if(sel) sel.onchange=()=>{ WON.prov=sel.value; WON.wk=null; renderWon(true); };
+}
+
 /* ---------- views ---------- */
 function resHeader(){
  const d=R.data, p=d.prog, final=p.vd[1]>0 && p.vd[0]>=p.vd[1], t=d.turnout;
@@ -1547,15 +1644,15 @@ function viewOverview(){
  ${rows.length?`<div class="cmp-scroll"><table class="nt"><thead><tr><th scope="col">Party</th><th scope="col">Share of the vote</th><th scope="col">Wards won</th><th scope="col">Councils won outright</th></tr></thead><tbody>
  ${top.map(r=>{const p=rp(r[0]), ww=wmap.get(r[0]);return `<tr><td>${chip(r[0])}<span class="pname">${esc(p.name)}</span></td>
   <td class="num"><span class="vbar"><i style="width:${Math.min(100,r[2])}%;background:${p.c}"></i></span> <b>${r[2].toFixed(1)}%</b>${swing(r[0],r[2],base21())} <span class="src">${fmt(r[1])}</span></td>
-  <td class="num"><b>${ww?fmt(ww.won):0}</b>${ww&&ww.lead?` <span class="src">+${ww.lead} leading</span>`:''}</td>
-  <td class="num"><b>${cmap.get(r[0])||0}</b></td></tr>`}).join('')}
+  <td class="num">${ww?wonBtn(r[0],'wards','',`<b>${fmt(ww.won)}</b>${ww.lead?` <span class="src">+${ww.lead} leading</span>`:''}`,`Which wards ${p.abbr} won or leads`):'<b>0</b>'}</td>
+  <td class="num">${cmap.get(r[0])?wonBtn(r[0],'councils','',`<b>${cmap.get(r[0])}</b>`,`Which councils ${p.abbr} won`):'<b>0</b>'}</td></tr>`}).join('')}
  </tbody></table></div>${rows.length>top.length?`<p class="src">${rows.length-top.length} smaller parties and independents not shown.</p>`:''}${swingNote()}`
  :`<div class="empty"><p>No votes have been counted yet.</p><p class="src">Results come in district by district through the night. This page checks for new figures every minute.</p></div>`}
  <div class="two" style="margin-top:28px">
   <div class="card"><h3>Metros</h3><ul class="mini">${METRO_ORDER.filter(k=>d.munis[k]).map(k=>{const m=d.munis[k],s=councilStatus(m);return `<li><button data-rmetro="${k}"><span class="nm">${esc(muniName(k))}</span>${statusPill(s)}<span class="stack thin" style="grid-column:1/-1">${(m.res||[]).filter(r=>r[1]).sort((a,b)=>b[1]-a[1]).map(r=>`<i style="width:${r[2]}%;background:${rp(r[0]).c}"></i>`).join('')}</span></button></li>`}).join('')}</ul></div>
   <div class="card"><h3>Provinces</h3><ul class="mini">${d.prov.map(p=>{const l=votesLeader(p.res), wt=wardTally(p.munis);return `<li><button data-rprov="${p.code}"><span class="nm">${esc(PROV[p.code])}</span><span>${l?chip(l[0],` ${l[2].toFixed(0)}%`):'<span class="src">No results</span>'}</span>${stack(wt.list.map(x=>[x[0],x[1]]),wt.total,'thin')}</button></li>`}).join('')}</ul></div>
  </div>
- <p class="src" style="margin-top:14px">Bars under each province show wards won or leading. "Share of the vote" is the party (PR) ballot across all councils.</p>`;
+ <p class="src" style="margin-top:14px">Tap a number of wards or councils to see which ones. Bars under each province show wards won or leading. "Share of the vote" is the party (PR) ballot across all councils.</p>`;
 }
 
 function councilTable(codes){
@@ -1579,15 +1676,15 @@ function viewProvinces(){
   return `<nav class="crumbs" aria-label="Breadcrumb"><button data-rprov="">All provinces</button><span aria-hidden="true">›</span><b>${esc(PROV[p.code])}</b></nav>
   <div class="rcard" style="margin-bottom:20px"><h3>${esc(PROV[p.code])}<small>${p.prog?pct(p.prog.vd[0],p.prog.vd[1]).toFixed(0)+'% counted':''}</small></h3>
    <div><div class="lbl">Most votes</div><div class="big">${l?chip(l[0],` ${l[2].toFixed(1)}%`):'<span class="src">No results yet</span>'}</div></div>
-   <div><div class="lbl">Wards won or leading</div>${stack(wardTally(p.munis).list.map(x=>[x[0],x[1]]),wardTally(p.munis).total)}${wardLine(wardTally(p.munis),6)}</div>
-   <div><div class="lbl">Councils</div>${councilLine(councilTally(p.munis))}</div></div>
+   <div><div class="lbl">Wards won or leading</div>${stack(wardTally(p.munis).list.map(x=>[x[0],x[1]]),wardTally(p.munis).total)}${wardLine(wardTally(p.munis),6,'prov:'+p.code)}</div>
+   <div><div class="lbl">Councils</div>${councilLine(councilTally(p.munis),'prov:'+p.code)}</div></div>
   <h3>Every council in ${esc(PROV[p.code])}</h3>${councilTable(codes)}`;
  }
  return `<div class="rgrid">${d.prov.map(p=>{const l=votesLeader(p.res), w=wardTally(p.munis), c=councilTally(p.munis);
   return `<section class="rcard"><h3>${esc(PROV[p.code])}<small>${p.prog?pct(p.prog.vd[0],p.prog.vd[1]).toFixed(0)+'% counted':'No results yet'}</small></h3>
   <div><div class="lbl">Most votes</div><div class="big">${l?chip(l[0],` ${l[2].toFixed(1)}%`):'<span class="src">Waiting</span>'}</div></div>
-  <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3)}</div>
-  <div><div class="lbl">Councils won outright</div>${councilLine(c)}</div>
+  <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3,'prov:'+p.code)}</div>
+  <div><div class="lbl">Councils won outright</div>${councilLine(c,'prov:'+p.code)}</div>
   <button class="btn ghost small" data-rprov="${p.code}">See ${p.munis.length} councils</button></section>`}).join('')}</div>`;
 }
 
@@ -1599,7 +1696,7 @@ function viewMetros(){
   <div class="big">${s.lead!=null?chip(s.lead):''} ${statusPill(s)}</div>
   <div><div class="lbl">Seats</div>${seatBar(m)}</div>
   <div><div class="lbl">Party vote</div>${voteList(k,5)}</div>
-  <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3)}</div>
+  <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3,'muni:'+k)}</div>
   <div class="share-row" style="margin-top:auto"><button class="btn small" data-rmuni="${k}" data-rcoalgo="1">Wards and coalitions</button><button class="btn ghost small" data-rwa="${k}">Share on WhatsApp</button></div></section>`}).join('')}</div>${swingNote()}`;
 }
 
@@ -1615,8 +1712,8 @@ function viewDistricts(){
   const w=wardTally(dd.codes);
   return `<nav class="crumbs" aria-label="Breadcrumb"><button data-rdist="">All districts</button><span aria-hidden="true">›</span><span>${esc(PROV[dd.prov])}</span><span aria-hidden="true">›</span><b>${esc(dd.name)}</b></nav>
   <div class="rcard" style="margin-bottom:20px"><h3>${esc(dd.name)} District<small>${dd.codes.length} local councils</small></h3>
-   <div><div class="lbl">Wards won or leading</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,6)}</div>
-   <div><div class="lbl">Local councils won outright</div>${councilLine(councilTally(dd.codes))}</div></div>
+   <div><div class="lbl">Wards won or leading</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,6,'dist:'+dd.prov+'|'+dd.name)}</div>
+   <div><div class="lbl">Local councils won outright</div>${councilLine(councilTally(dd.codes),'dist:'+dd.prov+'|'+dd.name)}</div></div>
   ${councilTable(dd.codes)}`;
  }
  const provs=[...new Set(ds.map(x=>x.prov))];
@@ -1625,8 +1722,8 @@ function viewDistricts(){
  <div class="pchips" role="group" aria-label="Filter by province"><button aria-pressed="${!f}" data-rdprov="">All</button>${provs.map(p=>`<button aria-pressed="${f===p}" data-rdprov="${p}">${esc(PROV[p])}</button>`).join('')}</div>
  <div class="rgrid">${ds.filter(x=>!f||x.prov===f).map(dd=>{const w=wardTally(dd.codes);
   return `<section class="rcard"><h3>${esc(dd.name)}<small>${esc(PROV[dd.prov])}</small></h3>
-  <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3)}</div>
-  <div><div class="lbl">Councils won outright</div>${councilLine(councilTally(dd.codes))}</div>
+  <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3,'dist:'+dd.prov+'|'+dd.name)}</div>
+  <div><div class="lbl">Councils won outright</div>${councilLine(councilTally(dd.codes),'dist:'+dd.prov+'|'+dd.name)}</div>
   <button class="btn ghost small" data-rdist="${esc(dd.prov+'|'+dd.name)}">See ${dd.codes.length} councils</button></section>`}).join('')}</div>`;
 }
 
@@ -1706,6 +1803,7 @@ document.getElementById('s-results').addEventListener('click',e=>{
  if(ds.rwa!==undefined){ window.open('https://wa.me/?text='+encodeURIComponent(shareText(ds.rwa)),'_blank','noopener'); return; }
  if(ds.rshare!==undefined){ navigator.share({text:shareText(ds.rshare)}).catch(()=>{}); return; }
  if(ds.rfeed!==undefined){ R.feedAll=!R.feedAll; return renderResults(); }
+ if(ds.rwon!==undefined) return openWon(+ds.rwon, ds.rwk, ds.rscope);
  if(ds.rward!==undefined){ const k=+ds.rward; return setRes({ward:R.ward===k?null:k}); }
  if(ds.rhl!==undefined){ const k=+ds.rhl; return setRes({hl:R.hl===k?null:k}); }
  if(ds.rcands!==undefined){ candState.view='wards'; candState.code=R.muni; candState.label=muniName(R.muni); candState.ward=+ds.rcands; saveCand(); renderCands(); showTab('cands'); }
