@@ -40,17 +40,21 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           OUT="$RUNNER_TEMP/live.json"
           WARDS="$RUNNER_TEMP/wards"
+          RAW="$RUNNER_TEMP/raw"
+          PROJ="$RUNNER_TEMP/projections.json"
           mkdir -p "$WARDS"
           # Start from the last published copy so a failed province keeps its data,
           # and councils not refetched this run keep their ward files.
           if git fetch -q origin live-data 2>/dev/null; then
             git show FETCH_HEAD:live.json > "$OUT"; first=false
             git archive FETCH_HEAD wards 2>/dev/null | tar -x -C "$RUNNER_TEMP" || true
+            git show FETCH_HEAD:projections.json > "$PROJ" 2>/dev/null || rm -f "$PROJ"
           else cp results/live.json "$OUT"; first=true; fi
 
           publish() {
-            # live.json plus wards/<council>.json, as one commit with no parent
+            # live.json, projections.json and wards/<council>.json, as one commit with no parent
             tree=$( { printf '100644 blob %s\tlive.json\n' "$(git hash-object -w "$OUT")"
+                      [ -s "$PROJ" ] && printf '100644 blob %s\tprojections.json\n' "$(git hash-object -w "$PROJ")"
                       [ -n "$(ls -A "$WARDS")" ] && printf '040000 tree %s\twards\n' "$(for f in "$WARDS"/*.json; do printf '100644 blob %s\t%s\n' "$(git hash-object -w "$f")" "$(basename "$f")"; done | git mktree)"
                     } | git mktree)
             commit=$(git commit-tree "$tree" -m "Live results $(date -u +%FT%TZ)")
@@ -73,11 +77,23 @@ jobs:
             python3 -c "import json,sys;p=json.load(open('$OUT'))['prog'];sys.exit(0 if p['munis'][1] and p['munis'][0]>=p['munis'][1] and p['vd'][0]>=p['vd'][1] else 1)"
           }
 
+          # Projection model (scripts/project.py): rerun at most every 5 minutes, using the
+          # metro files fetch_results.py just saved. A failure never stops the relay.
+          last_proj=-1000
+          project() {
+            [ $((SECONDS - last_proj)) -lt 300 ] && return 1
+            last_proj=$SECONDS
+            timeout 240 python3 scripts/project.py --live "$OUT" --raw-dir "$RAW" --out "$PROJ.new" && mv "$PROJ.new" "$PROJ"
+          }
+
           end=$((SECONDS + LOOP_MINUTES * 60))
           final=false
           while :; do
             started=$SECONDS
-            if python3 scripts/fetch_results.py --out "$OUT" --wards-dir "$WARDS" | tee /dev/stderr | grep -q '^wrote' || [ "$first" = true ]; then publish; first=false; fi
+            changed=false
+            python3 scripts/fetch_results.py --out "$OUT" --wards-dir "$WARDS" --raw-dir "$RAW" | tee /dev/stderr | grep -q '^wrote' && changed=true
+            project && changed=true || true
+            if [ "$changed" = true ] || [ "$first" = true ]; then publish; first=false; fi
             to_master || echo "warn: master update failed"
             if is_final; then final=true; echo "Counting complete"; break; fi
             [ $SECONDS -ge $end ] && break

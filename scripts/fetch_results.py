@@ -91,7 +91,7 @@ FULL_EVERY = 300   # refetch a non-metro council's full party list at most every
 FULL_MAX = 40      # and at most this many full files per run (each is ~100-300 KB gzipped)
 
 
-def fetch_full(base, data, prev, used, wards_dir=None):
+def fetch_full(base, data, prev, used, wards_dir=None, raw_dir=None):
     """The province feed lists only each council's top three parties. The per-council
     file (EEID...Munic{id}.js) has every party but is large, so fetch it only for
     councils whose count moved, metros first, and reuse the last copy otherwise."""
@@ -122,6 +122,12 @@ def fetch_full(base, data, prev, used, wards_dir=None):
             rows = (full or {}).get("PartyBallotResults")
             if not rows:
                 continue
+            # Keep the raw metro files for the projection model (scripts/project.py),
+            # so it doesn't download these large files a second time.
+            if raw_dir and code in METRO_PREFIX:
+                os.makedirs(raw_dir, exist_ok=True)
+                with open(os.path.join(raw_dir, f"{code}.json"), "w") as f:
+                    json.dump(full, f, separators=(",", ":"))
             res = [r for r in results(rows, set()) if r[1] or r[5]][:30]
             used.update(r[0] for r in res)
             data["munis"][code]["all"], data["munis"][code]["ft"] = res, now
@@ -160,6 +166,7 @@ def main():
     ap.add_argument("--year", default="2026")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "..", "results", "live.json"))
     ap.add_argument("--wards-dir", help="where to write per-council ward votes (default: wards/ next to --out)")
+    ap.add_argument("--raw-dir", help="also save the raw metro council files here (for scripts/project.py)")
     a = ap.parse_args()
 
     base = f"{BASE}/{a.year}/EEID{a.event}"
@@ -236,7 +243,7 @@ def main():
                              "turnout": turnout(p.get("PartyBallotResults")),
                              "res": results(p.get("PartyBallotResults"), used), "munis": codes})
 
-    fetch_full(base, data, prev, used, a.wards_dir or os.path.join(os.path.dirname(out), "wards"))
+    fetch_full(base, data, prev, used, a.wards_dir or os.path.join(os.path.dirname(out), "wards"), a.raw_dir)
 
     data["parties"] = {str(i): [pmeta[i]["Name"], pmeta[i]["PartyFullName"].title(), pmeta[i]["sWebColour"]]
                        for i in sorted(used) if i in pmeta}

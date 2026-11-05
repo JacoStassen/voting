@@ -49,3 +49,12 @@ The IEC's results feed (`results.elections.org.za/dashboards/lge/MapsJason/…`)
 - **Track live**: people can pin the country, a province, district, council or ward as live tiles at the top of Live results. Websites can't create iOS Live Activities or Android live notifications, so the site offers what the web allows: a floating pop-out window (Document Picture-in-Picture, Chrome and Edge on computers), alerts when a tracked area is declared, a ward is won or the lead changes (while the site is open), and the % counted as a badge on the installed app's icon.
 - Installable: `manifest.webmanifest`, `sw.js` (no caching; it's there for install and alerts) and icons in `icons/` (`icon.svg` is the source; PNGs and `favicon.ico` were rendered from it with ImageMagick). `?tab=results` or `?tab=cands` opens a tab directly.
 - Link straight to a council with `?council=JHB` (any IEC council code). The WhatsApp share buttons use this.
+
+## Projections
+
+The **Projections** view (and lines on the overview, metro cards and turnout cards) shows where the count is heading.
+
+- `scripts/project.py` runs inside the relay every 5 minutes and publishes `projections.json` next to `live.json` on `live-data`. It's a swing model: each counted voting district is compared with 2021 (`data/baseline2021.json`, built once by `scripts/build_vd_baseline.py`), and uncounted districts get their 2021 result plus the swing from the same ward, or from the wards that voted most like it in 2021. Resampling gives ranges and how often a party reaches a majority; a council is called only at 90 in 100 either way.
+- It reads the raw metro files that `fetch_results.py --raw-dir` already downloaded, so the IEC isn't hit twice.
+- Backtest it: `python3 scripts/build_vd_baseline.py --event 402 --year 2016 --out /tmp/b2016.json && python3 scripts/project.py --backtest --base /tmp/b2016.json`.
+- `results/external.json` holds other people's projections (the CSIR's, from news reports), with source links and times. Edit it by hand to add newer figures.

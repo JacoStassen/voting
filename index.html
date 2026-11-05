@@ -413,6 +413,20 @@ table.nt td.num,table.ct td.num{font-variant-numeric:tabular-nums;white-space:no
 .wonw{min-width:40px;padding:3px 7px;border:1px solid var(--line);border-top:4px solid var(--c);border-radius:5px;background:var(--paper);color:var(--ink);font-size:.85rem;font-variant-numeric:tabular-nums;cursor:pointer}
 .wonw.lead{border-top-style:dashed}
 .turnout{margin:0 0 24px}
+.proj-strip{margin:0 0 18px;border-left:6px solid var(--violet)}
+.proj-strip .pj-item{white-space:nowrap}
+.tiles4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 10px}
+.pjlist{list-style:none;margin:0;padding:0}
+.pjlist li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:5px 0;border-top:1px solid var(--line)}
+.pjlist li:first-child{border-top:0}
+.rbar{grid-column:1/-1;position:relative;display:block;height:8px;background:var(--track);border-radius:99px}
+.rbar i{position:absolute;top:0;bottom:0;border-radius:99px;opacity:.45}
+.rbar b{position:absolute;top:-3px;bottom:-3px;width:3px;transform:translateX(-1.5px);border-radius:2px}
+.pj-ext{border-top:1px dashed var(--line);padding-top:10px}
+.pj-how{margin-top:26px;background:var(--sheet);border:1px solid var(--line);border-radius:8px;padding:12px 18px}
+.pj-how summary{cursor:pointer;font-weight:700}
+.pj-how p{max-width:75ch;text-wrap:pretty}
+@media (max-width:760px){.tiles4{grid-template-columns:1fr 1fr}}
 .turnout .tgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:8px 0 14px}
 .turnout .tgrid div{min-width:0}
 .turnout .k{font-size:.82rem;color:var(--muted);font-weight:700}
@@ -1492,11 +1506,12 @@ async function loadResults(){
   let got=null, last=null;
   for(const u of await liveUrls()){
    const pinned = shaVal && u.includes(shaVal); // a file at a fixed commit never changes, so it can be cached
-   try{ const r=await fetch(pinned ? u : u+'?t='+Date.now(), {cache: pinned ? 'default' : 'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); got=await r.json(); break; }
+   try{ const r=await fetch(pinned ? u : u+'?t='+Date.now(), {cache: pinned ? 'default' : 'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); got=await r.json(); R.src=u; break; }
    catch(e){ last=e; }
   }
   if(!got) throw last;
   R.data = got; R.err = null;
+  try{ await loadProjections(R.src); }catch(e){}
   try{ updateFeed(got); }catch(e){}
   const dl=document.getElementById('wonDlg'); if(dl && dl.open) renderWon(false);
   onResultsLoaded();
@@ -1712,7 +1727,8 @@ function turnoutCard(label, t, vd, rows, base){
   <div class="tgrid">
    <div><div class="k">Registered voters</div><div class="v">${fmt(T.reg)}</div></div>
    <div><div class="k">Votes counted so far</div><div class="v">${fmt(T.voters)}</div><div class="src">${(T.frac*100).toFixed(0)}% of voting districts in</div></div>
-   <div><div class="k">Turnout</div><div class="v">Too early</div>${b?`<div class="src">2021: ${pctTxt(b)}</div>`:''}</div>
+   ${(()=>{const pj=projTurnout(label); return pj?`<div><div class="k">Projected turnout</div><div class="v">about ${pj[0]}%</div><div class="src">range ${pj[1]}–${pj[2]}%${b?` · 2021: ${pctTxt(b)}`:''} · <button class="plink" data-rview="projections">how</button></div></div>`
+     :`<div><div class="k">Turnout</div><div class="v">Too early</div>${b?`<div class="src">2021: ${pctTxt(b)}</div>`:''}</div>`;})()}
   </div>
   <p class="src" style="margin:0">${turnoutWhy}</p>
   ${ballotBox(label,T,lead,b)}</div>`;
@@ -1828,6 +1844,83 @@ function renderWon(top){
  const sel=dl.querySelector('#wonProv'); if(sel) sel.onchange=()=>{ WON.prov=sel.value; WON.wk=null; renderWon(true); };
 }
 
+/* ---------- Projections ----------
+   projections.json comes from scripts/project.py (run by the relay every 5 minutes):
+   a swing model comparing each counted voting district with 2021, with ranges from
+   resampling. external.json holds hand-curated projections by others (the CSIR). */
+const EXT_URLS = ['results/external.json', RAW_BASE+'master/results/external.json'];
+async function loadProjections(src){
+ if(src){ try{ const r=await fetch(src.replace(/live\.json$/,'projections.json')+(src.includes(shaVal||'@')?'':'?t='+Date.now()), {cache:'no-store'}); if(r.ok) R.proj=await r.json(); }catch(e){} }
+ if(!R.ext || Date.now()-(R.extAt||0)>300000){
+  for(const u of EXT_URLS){ try{ const r=await fetch(u+'?t='+Date.now(),{cache:'no-store'}); if(r.ok){ R.ext=await r.json(); R.extAt=Date.now(); break; } }catch(e){} }
+ }
+}
+const extFor = code => code ? ((R.ext&&R.ext.metros||{})[code]||[]) : ((R.ext&&R.ext.national)||[]);
+const iecId = code => { const ps=R.data&&R.data.parties||{}; const k=Object.keys(ps).find(i=>ps[i][0]===code); return k!=null?+k:null; };
+function projCall(code){
+ const p=R.proj&&R.proj.metros&&R.proj.metros[code]; if(!p) return null;
+ const lead=p.lead!=null?rp(p.lead).abbr:'', n=x=>Math.round(x*100);
+ if(p.call.k==='early') return {k:'wait', text:'Too early to project', why:`Only ${(p.coverage*100).toFixed(0)}% of the 2021 vote's areas counted`};
+ if(p.call.k==='won') return {k:'won', text:`${lead} projected to win outright`, why:`Majority in ${n(p.p_major)} of 100 simulations`};
+ if(p.call.k==='hung') return {k:'hung', text:p.call.text.includes('unclear')?'Projected hung: unclear who is largest':`Projected hung: ${lead} largest`, why:`Majority in ${n(p.p_major)} of 100 simulations; ${lead} largest in ${n(p.p_lead)}`};
+ return {k:'lead', text:`Too close to call: ${lead} ahead`, why:`Majority in ${n(p.p_major)} of 100 simulations`};
+}
+function projTurnout(label){
+ const P=R.proj; if(!P) return null;
+ if(label==='South Africa') return P.turnout ? [P.turnout.mid,P.turnout.lo,P.turnout.hi] : null;
+ const code=METRO_ORDER.find(k=>R.data.munis[k] && muniName(k)===label);
+ return code && P.metros[code] && P.metros[code].turnout || null;
+}
+const projLine = code => { const c=projCall(code); return c ? `<div class="tline"><span class="status ${c.k}">${esc(c.text)}</span> <span class="src">Our projection · ${esc(c.why)} · <button class="plink" data-rview="projections">How?</button></span></div>` : ''; };
+function rangeBar(mid, lo, hi, color, max){
+ const s=x=>Math.max(0,Math.min(100,x/max*100)).toFixed(2);
+ return `<span class="rbar" aria-hidden="true"><i style="left:${s(lo)}%;width:${(s(hi)-s(lo)).toFixed(2)}%;background:${color}"></i><b style="left:${s(mid)}%;background:${color}"></b></span>`;
+}
+function projStrip(){
+ if(!R.proj) return '';
+ const items=METRO_ORDER.map(k=>[k,projCall(k)]).filter(([,c])=>c&&c.k!=='wait');
+ const t=R.proj.turnout;
+ if(!items.length && !t) return '';
+ return `<div class="card proj-strip"><div class="lbl">Our projections</div>
+  ${t?`<p style="margin:0 0 6px">Turnout heading for about <b>${t.mid}%</b> <span class="src">(range ${t.lo}–${t.hi}%; 2021: ${t.t2021}%)</span></p>`:''}
+  ${items.length?`<p style="margin:0">${items.map(([k,c])=>`<span class="pj-item"><b>${esc(muniName(k))}:</b> ${esc(c.text.replace(/ projected to win outright/,' outright').replace(/^Projected hung/,'Hung'))}</span>`).join(' · ')}</p>`:''}
+  <p class="src" style="margin:6px 0 0"><button class="plink" data-rview="projections">See projections and the CSIR's figures</button></p></div>`;
+}
+function viewProjections(){
+ const P=R.proj, d=R.data, ext=extFor(null)[0];
+ if(!P) return `<div class="empty"><p>Projections will appear a few minutes after counting picks up.</p><p class="src">They're recalculated every 5 minutes.</p></div>`;
+ const t=P.turnout, T=turnoutOf(d.turnout,d.prog.vd), b21=B21&&B21.t&&rate21(B21.t.nat);
+ const ago=Math.round((Date.now()-Date.parse(P.fetched))/60000);
+ const extLine = e => e ? `<a href="${e.url}" target="_blank" rel="noopener">${esc(e.source)}</a>, ${esc(e.counted||'')}${e.asOf?`, ${tm(e.asOf)}`:''}` : '';
+ return `<p class="intro">Who is likely to win, before the count is finished. Our projection compares each counted voting district with how it voted in 2021 and applies those swings to the districts still to come. Projections can be wrong; the official results are what count.</p>
+ <p class="src" style="margin:-14px 0 18px">Updated ${ago<1?'just now':ago+' min ago'}, from the count as of ${tm(P.report)}.</p>
+ <h3>How many people voted</h3>
+ <div class="tiles4">
+  <div class="tile"><div class="k">Our projection</div><div class="v">${t?t.mid+'%':'—'}</div><div class="s">${t?`range ${t.lo}–${t.hi}%`:'Not enough counted yet'}</div></div>
+  <div class="tile"><div class="k">CSIR projection</div><div class="v">${ext&&ext.turnout?ext.turnout+'%':'—'}</div><div class="s">${ext?extLine(ext):'Not published yet'}</div></div>
+  <div class="tile"><div class="k">2021 local elections</div><div class="v">${b21?pctTxt(b21):(t?t.t2021+'%':'—')}</div><div class="s">for comparison</div></div>
+  <div class="tile"><div class="k">Counted so far</div><div class="v">${T?fmt(T.voters):'—'}</div><div class="s">voters, from ${pct(d.prog.vd[0],d.prog.vd[1]).toFixed(0)}% of voting districts</div></div>
+ </div>
+ <p class="src">Turnout is the hardest thing to project early: districts that report first are not typical. Outside the metros we only know how many districts are in, not how many voters they hold, so our national figure has a wide range and may read low.</p>
+ <h3 style="margin-top:26px">The metros</h3>
+ <div class="rgrid">${METRO_ORDER.filter(k=>d.munis[k]).map(k=>{
+  const p=P.metros[k], c=projCall(k), m=d.munis[k], ex=extFor(k)[0];
+  const rows=(p&&p.proj||[]).slice(0,5), max=Math.max(60,...rows.map(r=>r[3]+5));
+  return `<section class="rcard" style="--c:${p&&p.lead!=null?rp(p.lead).c:'var(--line)'}"><h3>${esc(muniName(k))}<small>${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted</small></h3>
+   ${c?`<div><span class="status ${c.k}">${esc(c.text)}</span><div class="src" style="margin-top:4px">${esc(c.why)}</div></div>`:'<span class="src">No projection yet</span>'}
+   ${rows.length?`<div><div class="lbl">Projected share of the vote (bar = likely range)</div><ul class="pjlist">${rows.map(r=>`<li>${chip(r[0])}<span class="num"><b>${r[1].toFixed(1)}%</b> <span class="src">${r[2].toFixed(0)}–${r[3].toFixed(0)}</span></span>${rangeBar(r[1],r[2],r[3],rp(r[0]).c,max)}</li>`).join('')}</ul></div>
+   <div><div class="lbl">Projected seats (${p.need} of ${p.seats} for a majority)</div>${withMaj(stack(rows.filter(r=>r[4]).map(r=>[r[0],r[4]]),p.seats),p.need,p.seats)}<div class="tally">${rows.filter(r=>r[4]).slice(0,4).map(r=>`<span>${chip(r[0])} <b>${r[4]}</b> <span class="src">(${r[5]}–${r[6]})</span></span>`).join('')}</div></div>`:''}
+   ${p&&p.turnout?`<div class="tline">Projected turnout <b>${p.turnout[0]}%</b> <span class="src">(${p.turnout[1]}–${p.turnout[2]}%)</span></div>`:''}
+   <div class="pj-ext"><div class="lbl">CSIR</div>${ex?`<p style="margin:0">${esc(ex.call||'')}${ex.call?'. ':''}${Object.entries(ex.shares||{}).slice(0,4).map(([a,v])=>{const id=iecId(a);return id!=null?`${chip(id)} ${v}%`:`${esc(a)} ${v}%`}).join(' · ')}${ex.turnout?` · turnout ${ex.turnout}%`:''}</p><p class="src" style="margin:4px 0 0">${extLine(ex)}</p>`:'<p class="src" style="margin:0">No CSIR figures found for this metro yet.</p>'}</div>
+  </section>`}).join('')}</div>
+ <details class="pj-how"><summary>How our projection works, and how well it did on 2021</summary>
+  <p>For every voting district counted so far that also existed in 2021, we compare the 2026 vote with the 2021 vote: how much each party's share moved, and how many more or fewer people voted. Districts not yet counted get their 2021 result plus the swing seen in counted districts in the same ward, or, where a ward has none counted yet, the swing in wards that voted most like it in 2021. That matters because whole areas report together: the suburbs may be in before the townships.</p>
+  <p>We rerun the projection 150 times on resampled districts, adding extra error because counting order isn't random, to get the ranges and how often a party reaches a majority. We call a council only when that happens in at least 90 of 100 runs, or in no more than 10.</p>
+  <p>Tested on 2021, using 2016 as the baseline, with a quarter of the districts counted: when districts came in a mixed order, vote shares were within about 1–2 points and every call was right or "too close". In a worst case where only one party's strongholds were counted first, shares were off by up to about 7 points, but calls stayed right or "too close", apart from Mangaung, which a party won with 50.6% of seats. Turnout is less reliable early: up to 12 points off in the worst case, which is why its ranges are wide.</p>
+  <p>Seats are shared out in proportion to each party's projected share of all votes, which is close to the IEC's formula. eThekwini and other councils with few districts counted show "too early" until at least 3% of their 2021 vote is in. The CSIR's figures are copied by hand from news reports and dated.</p>
+ </details>`;
+}
+
 /* ---------- views ---------- */
 function resHeader(){
  const d=R.data, p=d.prog, final=p.vd[1]>0 && p.vd[0]>=p.vd[1], t=d.turnout;
@@ -1844,7 +1937,7 @@ function resHeader(){
   <div class="tile"><div class="k">Seats allocated</div><div class="v">${fmt(p.seats[0])}</div><span class="bar"><i style="width:${pct(p.seats[0],p.seats[1])}%"></i></span><div class="s">of ${fmt(p.seats[1])} council seats; ${fmt(t.reg)} registered voters</div></div>
  </div>
  ${trackPanel()}
- <div class="res-segbar"><div class="seg res-seg" role="group" aria-label="Results view">${[['overview','Overview'],['provinces','Provinces'],['metros','Metros'],['districts','Districts'],['wards','Wards']].map(([k,l])=>`<button aria-pressed="${R.view===k}" data-rview="${k}">${l}</button>`).join('')}</div></div>`;
+ <div class="res-segbar"><div class="seg res-seg" role="group" aria-label="Results view">${[['overview','Overview'],['projections','Projections'],['provinces','Provinces'],['metros','Metros'],['districts','Districts'],['wards','Wards']].map(([k,l])=>`<button aria-pressed="${R.view===k}" data-rview="${k}">${l}</button>`).join('')}</div></div>`;
 }
 
 function viewOverview(){
@@ -1855,6 +1948,7 @@ function viewOverview(){
  const yours=store.get('place',null), ym=yours&&MUNIS[yours.m], yd=ym&&d.munis[ym.code];
  return `${yd?`<div class="notice" style="max-width:none"><b>Your council, ${esc(ym.name)}:</b> ${statusPill(councilStatus(yd))} ${pct(yd.prog.vd[0],yd.prog.vd[1]).toFixed(0)}% counted. <button class="plink" data-rmuni="${ym.code}">See its wards</button></div>`:''}
  ${headline()}
+ ${projStrip()}
  <div class="ov-top">${feedCard()}${turnoutCard('South Africa', d.turnout, d.prog.vd, d.nat, B21&&B21.t&&B21.t.nat)}</div>
  <h3>Who is ahead nationally</h3>
  ${rows.length?`<div class="cmp-scroll"><table class="nt"><thead><tr><th scope="col">Party</th><th scope="col">Share of the vote</th><th scope="col">Wards won</th><th scope="col">Councils won outright</th></tr></thead><tbody>
@@ -1912,6 +2006,7 @@ function viewMetros(){
  <div class="rgrid">${METRO_ORDER.filter(k=>d.munis[k]).map(k=>{const m=d.munis[k], s=councilStatus(m), w=wardTally([k]);
   return `<section class="rcard ${s.lead!=null?'accent':''}" id="metro-${k}" style="--c:${s.lead!=null?rp(s.lead).c:'var(--line)'}"><h3>${esc(muniName(k))}<small>${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted</small></h3>
   <div class="big">${s.lead!=null?chip(s.lead):''} ${statusPill(s)}</div>
+  ${projLine(k)}
   ${turnoutLine(m.turnout,m.prog.vd)}
   <div><div class="lbl">Seats</div>${seatBar(m)}</div>
   <div><div class="lbl">Party vote</div>${voteList(k,5)}</div>
@@ -2002,7 +2097,7 @@ function renderResults(){
    :`<div class="notice">Live results will appear here as the IEC publishes them. Voting closed at 21:00 on 4 November; councils usually start declaring within a few hours. Meanwhile, the <a href="${IEC_DASH}" target="_blank" rel="noopener">official IEC results dashboard</a> has the same figures.</div>`);
   return;
  }
- const views={overview:viewOverview,provinces:viewProvinces,metros:viewMetros,districts:viewDistricts,wards:viewWards};
+ const views={overview:viewOverview,projections:viewProjections,provinces:viewProvinces,metros:viewMetros,districts:viewDistricts,wards:viewWards};
  if(!views[R.view]) R.view='overview';
  const keepFocus = document.activeElement && document.activeElement.closest && document.activeElement.closest('#s-results') ? document.activeElement : null;
  const sel = keepFocus && ['rview','rward','rhl','rdprov','rcoal','ivoted','trk','trkrm'].map(k=>keepFocus.dataset[k]!==undefined?`[data-${k}="${CSS.escape(keepFocus.dataset[k])}"]`:null).find(Boolean);

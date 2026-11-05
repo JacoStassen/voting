@@ -1,0 +1,23 @@
+{
+  "note": "Hand-curated projections published by others. Edit this file to add newer figures; party codes are IEC codes (ANC, DA, MKP, EFF, ACTIONSA, UDM, PA, SACP, VF PLUS).",
+  "national": [
+    {"source": "CSIR (via SABC News)", "asOf": "2026-11-05T09:22:00+02:00", "counted": "13% of voting districts",
+     "turnout": 52.1,
+     "shares": {"ANC": 31.7, "DA": 25.7, "MKP": 9.0, "EFF": 6.1, "ACTIONSA": 5.1},
+     "url": "https://www.sabcnews.com/sabcnews/at-13-of-vds-declared-csir-early-predictions-place-anc-at-31-7/"}
+  ],
+  "metros": {
+    "BUF": [{"source": "CSIR", "asOf": "2026-11-05", "counted": "just over a third of voting districts",
+             "turnout": 51.1, "shares": {"ANC": 39.9, "DA": 18.2, "UDM": 9.9, "EFF": 7.2, "SACP": 5.1},
+             "call": "Hung: ANC largest",
+             "url": "https://www.thecommonsense.co.za/Politics/csir-model-predicts-buffalo-city-will-be-hung"}],
+    "NMA": [{"source": "CSIR", "asOf": "2026-11-05", "counted": "nearly 30% of voting districts",
+             "turnout": 52.4, "shares": {"DA": 41.0, "ANC": 28.8, "EFF": 5.4, "PA": 3.8, "UDM": 3.6},
+             "call": "DA largest",
+             "url": "https://www.thecommonsense.co.za/Politics/csir-model-predicts-da-41-0-anc-28-8-nelson-mandela-bay"}],
+    "MAN": [{"source": "CSIR", "asOf": "2026-11-05", "counted": "just under a quarter of voting districts",
+             "turnout": 51.3, "shares": {"ANC": 37.3, "DA": 30.2, "EFF": 8.4, "VF PLUS": 6.2, "PA": 3.1},
+             "call": "ANC loses majority; ANC largest",
+             "url": "https://www.thecommonsense.co.za/Politics/csir-model-predicts-anc-will-lose-majority-bloemfontein"}]
+  }
+}
