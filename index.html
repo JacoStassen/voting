@@ -2034,6 +2034,8 @@ document.getElementById('s-results').addEventListener('click',e=>{
  if(ds.trkgo!==undefined) return goTrack(JSON.parse(ds.trkgo));
  if(ds.trkpip!==undefined) return popOut().catch(e=>{ console.warn('Pop-out window failed:', e); t.textContent='Pop-out not available here'; t.disabled=true; });
  if(ds.trkalert!==undefined) return toggleAlerts();
+ if(ds.trklogall!==undefined){ TRK.logAll=!TRK.logAll; return renderResults(); }
+ if(ds.trklogclear!==undefined){ store.set('trkLog',[]); paintBadge(); return renderResults(); }
  if(ds.ivoted!==undefined){ const v=ds.ivoted==='1', cur=store.get('iVoted',null); store.set('iVoted', cur===v?null:v); return renderResults(); }
  if(ds.rward!==undefined){ const k=+ds.rward; return setRes({ward:R.ward===k?null:k}); }
  if(ds.rhl!==undefined){ const k=+ds.rhl; return setRes({hl:R.hl===k?null:k}); }
@@ -2092,6 +2094,7 @@ function trackPanel(){
   ${canAlert()?`<button class="btn ghost small" data-trkalert="1" aria-pressed="${al}">${al?'🔔 Alerts on':'🔕 Turn on alerts'}</button>`:''}</div>
   ${!canAlert()&&isIOS()&&!isInstalled()?`<p class="src" style="margin:0 0 10px">For alerts on an iPhone or iPad, add this site to your Home Screen (Share, then Add to Home Screen) and open it from there.</p>`:''}
   <div class="trkgrid">${TRK.list.map(x=>trackTile(x)).join('')}</div>
+  ${alertLog()}
   ${al?`<p class="src" style="margin:8px 0 0">You'll get an alert when a tracked area is declared, a ward is won, or the lead changes, while this site is open. Phones pause websites in the background, so keep it open (or add it to your home screen) to keep updates coming.</p>`:''}</section>`;
 }
 const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
@@ -2122,15 +2125,17 @@ function trackToast(x){
  else if(canAlert()) note=`Alerts are off. Turn them on in the Tracking panel any time.`;
  else if(isIOS() && !isInstalled()) note=`To get alerts on an iPhone or iPad, add this site to your Home Screen (Share, then Add to Home Screen) and open it from there.`;
  else note=`This browser can't show alerts, but the tile updates every minute.`;
+ showToast(`<p><b><span aria-hidden="true">★</span> Tracking ${esc(x.t==='ward'?i.title+', '+i.sub:i.title)}.</b> ${note}</p>
+  <div class="toast-a"><button class="btn small" data-tview>See it</button>${canPip()&&!TRK.pip?`<button class="btn ghost small" data-tpip>Pop out window</button>`:''}<button class="btn ghost small" data-tclose aria-label="Dismiss">OK</button></div>`);
+}
+function showToast(html, ms=12000){
  let t=document.getElementById('trkToast');
  if(!t){ t=document.createElement('div'); t.id='trkToast'; t.className='toast'; t.setAttribute('role','status'); document.body.appendChild(t);
   t.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
    if(b.dataset.tpip!==undefined) popOut().catch(err=>console.warn('Pop-out window failed:',err));
-   if(b.dataset.tview!==undefined){ const p=document.querySelector('.trkpanel'); p&&p.scrollIntoView({behavior:'smooth',block:'center'}); }
+   if(b.dataset.tview!==undefined){ if(state.tab!=='results') showTab('results'); setTimeout(()=>{ const p=document.querySelector(b.dataset.tview||'.trkpanel'); p&&p.scrollIntoView({behavior:'smooth',block:'center'}); },60); }
    t.hidden=true; }); }
- t.innerHTML=`<p><b><span aria-hidden="true">★</span> Tracking ${esc(x.t==='ward'?i.title+', '+i.sub:i.title)}.</b> ${note}</p>
-  <div class="toast-a"><button class="btn small" data-tview>See it</button>${canPip()&&!TRK.pip?`<button class="btn ghost small" data-tpip>Pop out window</button>`:''}<button class="btn ghost small" data-tclose aria-label="Dismiss">OK</button></div>`;
- t.hidden=false; clearTimeout(t._h); t._h=setTimeout(()=>{ t.hidden=true; }, 12000);
+ t.innerHTML=html; t.hidden=false; clearTimeout(t._h); t._h=setTimeout(()=>{ t.hidden=true; }, ms);
 }
 function goTrack(x){
  const i=trackInfo(x); if(!i) return;
@@ -2147,7 +2152,7 @@ function trackSigs(notify){
   if(sig.k!==o.k && (sig.k==='won'||sig.k==='hung')) msg = x.t==='ward' ? `${i.status} with ${i.lead[2].toFixed(1)}%` : i.status;
   else if(sig.l!=null && o.l!=null && sig.l!==o.l) msg = `${rp(sig.l).abbr} takes the lead from ${rp(o.l).abbr}`;
   else if(sig.done && !o.done) msg = 'Counting complete';
-  if(msg) sendAlert(x.t==='ward'?`${i.title}, ${i.sub}`:i.title, msg, i.url, id);
+  if(msg){ const title=x.t==='ward'?`${i.title}, ${i.sub}`:i.title; logAlert({t:Date.now(), title, body:msg, x}); sendAlert(title, msg, i.url, id); }
  });
  store.set('trkSig', now);
 }
@@ -2165,11 +2170,34 @@ async function toggleAlerts(){
  if(p==='denied') alert("Alerts are blocked for this site. You can allow them in your browser's site settings.");
  renderResults();
 }
-/* Badge on the installed app's icon: % counted for the first tracked area */
+/* Alert log: every alert is also kept here, so ones a phone held back (Focus mode,
+   notifications off) can still be read in the app. The app-icon badge is the number
+   of alerts you haven't seen yet, and clears when you open the app. */
+function logAlert(a){ store.set('trkLog', [a].concat(store.get('trkLog',[])).slice(0,40)); }
+const unseenAlerts = () => { const seen=store.get('trkSeen',0); return store.get('trkLog',[]).filter(a=>a.t>seen); };
 function paintBadge(){
+ if(document.visibilityState==='visible') markSeen();
  if(!('setAppBadge' in navigator)) return;
- const i=TRK.list[0] && trackInfo(TRK.list[0]);
- try{ (i && i.counted>0 ? navigator.setAppBadge(Math.round(Math.min(1,i.counted)*100)) : navigator.clearAppBadge()).catch(()=>{}); }catch(e){}
+ const n=unseenAlerts().length;
+ try{ (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(()=>{}); }catch(e){}
+}
+function markSeen(){ store.set('trkSeen', Date.now()); }
+/* Opening the app (or coming back to it): say what happened while you were away */
+function onAppShown(){
+ const away=unseenAlerts();
+ TRK.newSince=store.get('trkSeen',0); markSeen();
+ try{ 'clearAppBadge' in navigator && navigator.clearAppBadge().catch(()=>{}); }catch(e){}
+ if(!away.length) return;
+ const a=away[0];
+ showToast(`<p><b>${away.length===1?'1 alert':away.length+' alerts'} while you were away.</b> ${esc(a.title)}: ${esc(a.body)}${away.length>1?` and ${away.length-1} more`:''}.</p>
+  <div class="toast-a"><button class="btn small" data-tview=".trklog">See alerts</button><button class="btn ghost small" data-tclose>OK</button></div>`, 20000);
+ if(state.tab==='results') renderResults();
+}
+function alertLog(){
+ const log=store.get('trkLog',[]); if(!log.length) return '';
+ const since=TRK.newSince||0, hm=t=>new Date(t).toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
+ return `<div class="trklog"><div class="lbl" style="margin-top:14px">Recent alerts</div><ul class="feed">${log.slice(0,TRK.logAll?40:5).map(a=>`<li><time>${hm(a.t)}</time><span>${a.x?`<button class="plink" data-trkgo="${trkAttr(a.x)}">${esc(a.title)}</button>`:esc(a.title)}: ${esc(a.body)}${a.t>since?' <span class="status lead">New</span>':''}</span></li>`).join('')}</ul>
+  <p class="src" style="margin:6px 0 0">${log.length>5?`<button class="plink" data-trklogall="1">${TRK.logAll?'Show fewer':`Show all ${log.length}`}</button> · `:''}<button class="plink" data-trklogclear="1">Clear alerts</button></p></div>`;
 }
 /* Pop-out: a small always-on-top window with the tracked tiles */
 async function popOut(){
@@ -2266,12 +2294,14 @@ if(Date.now()>=POLLS_CLOSE) showTab('results');
 (()=>{ const c=new URLSearchParams(location.search).get('council'); if(c && /^[A-Z]{2,3}\d{0,3}$/i.test(c)){ Object.assign(R,{view:'wards', muni:c.toUpperCase(), ward:null, hl:null}); showTab('results'); } })();
 try{ const h=history.state; history.replaceState({...(h||{}), ...navSnap(), y:scrollY, depth:(h&&h.depth)||0}, ''); }catch(e){}
 NAV.ready=true; paintBack();
+onAppShown();
 loadResults();
 setInterval(()=>{ if(document.visibilityState==='visible' || TRK.pip || store.get('trkAlert',false)) loadResults(); }, 60000);
 if('serviceWorker' in navigator){
  navigator.serviceWorker.register('sw.js').catch(()=>{});
  navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.type==='open' && e.data.url) location.href=e.data.url; });
 }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') onAppShown(); });
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && Date.now()-R.loadedAt>60000) loadResults(); });
 </script>
 </body>
