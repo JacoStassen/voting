@@ -45,7 +45,7 @@
   color-scheme:light;
 }
 *,*::before,*::after{box-sizing:inherit}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px);overflow-x:clip}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:1.0625rem;line-height:1.65;-webkit-font-smoothing:antialiased}
 a{color:var(--violet);text-underline-offset:3px}
 button,input,select{font:inherit;color:inherit}
@@ -231,9 +231,19 @@ body.hasback{padding-bottom:76px}
 .rcard.accent{border-top:6px solid var(--c)}
 .rcard{transition:box-shadow .15s}
 .rcard:hover{box-shadow:0 4px 18px rgba(0,0,0,.08)}
+/* Results view switcher: a full-width bar pinned under the tabs. Once pinned it gets a
+   rule and shadow, and the pill slims down so it reads as part of the header. */
+.res-segbar{margin:0 0 24px}
+.res-segbar .seg{margin:0}
 @media (min-width:700px){
- .res-seg{position:sticky;top:calc(env(safe-area-inset-top,0px) + 58px);z-index:8;box-shadow:0 4px 14px rgba(0,0,0,.08)}
- #s-results .wdetail{top:calc(env(safe-area-inset-top,0px) + 124px)}
+ .res-segbar{position:sticky;top:var(--tabs-h,58px);z-index:8;padding:8px 0;margin:-8px 0 16px}
+ /* full-width backing behind the bar, so content doesn't show beside it */
+ .res-segbar::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:100vw;transform:translateX(-50%);background:var(--paper);z-index:-1;border-bottom:1px solid transparent;transition:border-color .15s,box-shadow .15s}
+ .res-segbar.stuck::before{border-bottom-color:var(--line);box-shadow:0 10px 18px -14px rgba(0,0,0,.5)}
+ .res-segbar .seg{transition:padding .15s,border-color .15s}
+ .res-segbar.stuck .seg{border-width:1px;border-color:var(--line);padding:3px}
+ .res-segbar.stuck .seg button{padding:6px 16px;font-size:.93rem}
+ #s-results .wdetail{top:calc(var(--tabs-h,58px) + var(--segbar-h,60px) + 8px)}
 }
 .backfab:hover{background:var(--violet);border-color:var(--violet);color:var(--on-violet)}
 .pdot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(128,128,128,.35);margin-right:8px}
@@ -1775,7 +1785,7 @@ function resHeader(){
   <div class="tile"><div class="k">Councils complete</div><div class="v">${fmt(p.munis[0])}</div><span class="bar"><i style="width:${pct(p.munis[0],p.munis[1])}%"></i></span><div class="s">of ${fmt(p.munis[1])}; ${p.hung} hung so far</div></div>
   <div class="tile"><div class="k">Seats allocated</div><div class="v">${fmt(p.seats[0])}</div><span class="bar"><i style="width:${pct(p.seats[0],p.seats[1])}%"></i></span><div class="s">of ${fmt(p.seats[1])} council seats; ${fmt(t.reg)} registered voters</div></div>
  </div>
- <div class="seg res-seg" role="group" aria-label="Results view">${[['overview','Overview'],['provinces','Provinces'],['metros','Metros'],['districts','Districts'],['wards','Wards']].map(([k,l])=>`<button aria-pressed="${R.view===k}" data-rview="${k}">${l}</button>`).join('')}</div>`;
+ <div class="res-segbar"><div class="seg res-seg" role="group" aria-label="Results view">${[['overview','Overview'],['provinces','Provinces'],['metros','Metros'],['districts','Districts'],['wards','Wards']].map(([k,l])=>`<button aria-pressed="${R.view===k}" data-rview="${k}">${l}</button>`).join('')}</div></div>`;
 }
 
 function viewOverview(){
@@ -1940,6 +1950,7 @@ function renderResults(){
  s.innerHTML = head+resHeader()+`<div id="resBody">${views[R.view]()}</div>`+
   `<p class="src" style="margin-top:22px">Source: Electoral Commission of South Africa results feed, copied here about once a minute. Figures can change until the IEC declares each council. Ward candidate names come from the IEC's certified list; check the <a href="${IEC_DASH}" target="_blank" rel="noopener">IEC dashboard</a> for official results.</p>`;
  if(sel){ const el=s.querySelector(sel); el&&el.focus({preventScroll:true}); }
+ segbarCheck();
  if(R.view==='wards' && document.getElementById('rq')) wireCombo('rq','sugg3',(label,m)=>{ if(!R.data.munis[m.code]) return; document.getElementById('rq').blur(); setRes({muni:m.code, ward:null, hl:null}); });
 }
 document.getElementById('s-results').addEventListener('click',e=>{
@@ -1962,6 +1973,16 @@ document.getElementById('s-results').addEventListener('click',e=>{
  if(ds.rhl!==undefined){ const k=+ds.rhl; return setRes({hl:R.hl===k?null:k}); }
  if(ds.rcands!==undefined){ candState.view='wards'; candState.code=R.muni; candState.label=muniName(R.muni); candState.ward=+ds.rcands; saveCand(); renderCands(); showTab('cands'); }
 });
+
+/* Sticky results bar: track the tab bar's height and mark the bar once it's pinned */
+function segbarCheck(){
+ const tabs=document.querySelector('.tabs'), bar=document.querySelector('.res-segbar'), root=document.documentElement.style;
+ const th=tabs?tabs.offsetHeight:58; root.setProperty('--tabs-h', th+'px');
+ if(!bar) return; root.setProperty('--segbar-h', bar.offsetHeight+'px');
+ bar.classList.toggle('stuck', getComputedStyle(bar).position==='sticky' && bar.getBoundingClientRect().top<=th+0.5);
+}
+addEventListener('scroll', segbarCheck, {passive:true});
+addEventListener('resize', segbarCheck);
 
 /* ============ BACK NAVIGATION ============
    Moving to another tab, or to another view, province, district or council in Live
