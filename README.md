@@ -42,3 +42,6 @@ The IEC's results feed (`results.elections.org.za/dashboards/lge/MapsJason/…`)
 - Run the relay by hand from the Actions tab (**Run workflow**), or locally with `python3 scripts/fetch_results.py`.
 - Test with full 2021 results: `python3 scripts/fetch_results.py --event 1091 --year 2021`. The page shows a "Test data" banner. Run it again without arguments afterwards so you don't commit 2021 data.
 - District figures add up each district's local councils, because the feed doesn't publish district councils' own results.
+- The province feed lists only each council's top three parties. For councils whose count moved, the relay also fetches the IEC's per-council file (`EEID…Munic{id}.js`, every party) and stores it as `all`: metros every minute, others at most every 5 minutes, up to 40 files a run. The coalition builder and the full party-vote lists use it.
+- `results/base2021.json` holds the 2021 result per council, province and nationally, for the ▲▼ swing figures. Rebuild it with `python3 scripts/build_baseline.py`.
+- Link straight to a council with `?council=JHB` (any IEC council code). The WhatsApp share buttons use this.

@@ -304,6 +304,24 @@ table.nt td.num,table.ct td.num{font-variant-numeric:tabular-nums;white-space:no
 .wdetail p{margin:4px 0}
 .key{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.85rem;color:var(--muted);margin:0 0 12px}
 .res-test{border-left-color:var(--concern);background:var(--concern-soft)}
+.sw{font-size:.78rem;font-weight:700;white-space:nowrap;margin-left:5px;font-variant-numeric:tabular-nums}
+.sw.up{color:var(--good)}.sw.down{color:var(--concern)}.sw.new{color:var(--violet)}.sw.flat{color:var(--muted)}
+.vlist{list-style:none;margin:0;padding:0}
+.vlist li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+.vlist li:first-child{border-top:0}
+.vlist .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.coal{border-top:1px solid var(--line);padding-top:14px}
+.coal .pchips{margin:0 0 10px}
+.coal .pchips button[aria-pressed="true"]{background:var(--violet-soft)}
+.coal-sum{font-weight:700;margin:10px 0 4px;padding:8px 12px;border-radius:6px;background:var(--paper);border:1px solid var(--line)}
+.coal-sum.ok{color:var(--good);background:var(--good-soft);border-color:var(--good)}
+.coal .stack{height:16px}
+.share-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.feed{list-style:none;margin:0;padding:0}
+.feed li{display:flex;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:.94rem}
+.feed li:first-child{border-top:0}
+.feed time{color:var(--muted);font-variant-numeric:tabular-nums;min-width:3.4em;flex:none}
+.feed li.big span{font-weight:700}
 .theme-btn{border:1px solid var(--line);background:var(--sheet);color:var(--ink);font-weight:700;border-radius:99px;padding:8px 16px;cursor:pointer}
 
 @media (max-width:760px){
@@ -1330,6 +1348,7 @@ async function loadResults(){
   }
   if(!got) throw last;
   R.data = got; R.err = null;
+  try{ updateFeed(got); }catch(e){}
  }catch(e){ R.err = e; }
  R.loadedAt = Date.now(); R.busy=false;
  const pill=document.getElementById('livePill');
@@ -1405,6 +1424,99 @@ function seatBar(m){
 }
 function votesLeader(res){ const r=(res||[]).slice().sort((a,b)=>b[1]-a[1])[0]; return r&&r[1]?r:null; }
 
+/* ---------- 2021 baseline, swing, coalitions, sharing, change feed ---------- */
+const SITE = 'https://voting.stassen.org.za/';
+let B21 = null; // results/base2021.json, built once by scripts/build_baseline.py
+fetch('results/base2021.json').then(r=>r.ok?r.json():null).then(j=>{ B21=j; if(j && state.tab==='results') renderResults(); }).catch(()=>{});
+/* The province feed carries only each council's top three parties; the relay adds the
+   full list as `all` (filled in over a few minutes as counting moves). */
+const partyRows = m => ((m.all && m.all.length) ? m.all : m.res) || [];
+const byVotes = rows => rows.filter(r=>r[1]>0 && r[0]!==-2).sort((a,b)=>b[1]-a[1]);
+const base21 = code => B21 && (code ? (B21.munis[code]||{}).res : B21.nat);
+/* Change in vote share since 2021. IEC party IDs stay the same between elections. */
+function swing(id, now, base){
+ if(!base || id===-2 || !(now>0)) return '';
+ const b = base.find(r=>r[0]===id);
+ if(!b) return B21.parties[String(id)] ? '' : `<span class="sw new" title="Not on the 2021 ballot">New</span>`;
+ const d = now-b[1], a = Math.abs(d);
+ if(a<0.05) return `<span class="sw flat" title="2021: ${b[1].toFixed(1)}%">±0</span>`;
+ return `<span class="sw ${d>0?'up':'down'}" title="2021: ${b[1].toFixed(1)}%"><span aria-hidden="true">${d>0?'▲':'▼'}</span><span class="sr">${d>0?'up':'down'}</span> ${a.toFixed(1)}</span>`;
+}
+const swingNote = () => B21 ? `<p class="src" style="margin:6px 0 0">▲▼ change in vote share since 2021, in percentage points. Early counts lean towards whichever areas report first.</p>` : '';
+function voteList(code, n=6){
+ const m=R.data.munis[code], rows=byVotes(partyRows(m)).slice(0,n), base=base21(code);
+ if(!rows.length) return '<span class="src">No votes counted yet</span>';
+ return `<ul class="vlist">${rows.map(r=>`<li>${chip(r[0])}<span class="num">${r[2].toFixed(1)}%${swing(r[0],r[2],base)}${r[5]?` · ${r[5]} seats`:''}</span></li>`).join('')}</ul>`;
+}
+const withMaj = (html, need, total) => html.replace(/<\/span>$/, `<b class="maj" style="left:${pct(need,total).toFixed(2)}%" aria-hidden="true"></b></span>`);
+
+/* Seats: the IEC's allocation once the council is complete, otherwise a projection by
+   largest remainder on the overall vote (close to the IEC's formula, which also
+   counts ward wins and independents, so treat it as a guide). */
+function seatsFor(m){
+ const total = m.prog.seats[1], rows = partyRows(m).filter(r=>r[0]!==-2);
+ if(!total) return null;
+ if(m.prog.seats[0]>=total && rows.some(r=>r[5]>0)) return {proj:false, total, list:rows.filter(r=>r[5]>0).map(r=>[r[0],r[5]]).sort((a,b)=>b[1]-a[1])};
+ if(!m.all) return null;
+ const votes = rows.reduce((a,r)=>a+r[1],0); if(!votes) return null;
+ const q = votes/total, list = rows.map(r=>{const e=r[1]/q; return [r[0], Math.floor(e), e-Math.floor(e)]});
+ const left = total - list.reduce((a,x)=>a+x[1],0);
+ list.slice().sort((a,b)=>b[2]-a[2]).slice(0,Math.max(0,left)).forEach(x=>x[1]++);
+ return {proj:true, total, list:list.filter(x=>x[1]>0).map(x=>[x[0],x[1]]).sort((a,b)=>b[1]-a[1])};
+}
+const COAL = {code:null, sel:new Set()};
+function coalBuilder(code){
+ const m=R.data.munis[code], s=seatsFor(m), head=`<div class="lbl">Coalition builder</div>`;
+ if(!s) return `<div class="coal" id="coal">${head}<span class="src">${m.prog.vd[0]?'Loading the full party list for this council; check back in a few minutes.':'Available once the first votes in this council are counted.'}</span></div>`;
+ if(COAL.code!==code){ COAL.code=code; COAL.sel=new Set(s.list.length?[s.list[0][0]]:[]); }
+ const need=Math.floor(s.total/2)+1, picked=s.list.filter(x=>COAL.sel.has(x[0])), sum=picked.reduce((a,x)=>a+x[1],0), ok=sum>=need;
+ const big=s.list.slice(0,8), pairs=[];
+ for(let i=0;i<big.length;i++) for(let j=i+1;j<big.length;j++){ const n=big[i][1]+big[j][1]; if(n>=need) pairs.push([big[i][0],big[j][0],n]); }
+ pairs.sort((a,b)=>a[2]-b[2]);
+ const solo = s.list[0] && s.list[0][1]>=need;
+ return `<div class="coal" id="coal">${head}
+  <p class="src" style="margin:0 0 10px">${s.proj?`Seats projected from the ${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% of voting districts counted so far; final seats can differ.`:`Final seat allocation.`} Tap parties to build a coalition: ${need} of ${s.total} seats is a majority.</p>
+  <div class="pchips" role="group" aria-label="Parties in the coalition">${s.list.map(([id,n])=>`<button aria-pressed="${COAL.sel.has(id)}" data-rcoal="${id}">${chip(id)} <b>${n}</b></button>`).join('')}</div>
+  ${withMaj(stack(picked,s.total),need,s.total)}
+  <p class="coal-sum ${ok?'ok':''}" aria-live="polite">${picked.length?esc(picked.map(x=>rp(x[0]).abbr).join(' + ')):'No parties picked'} = ${sum} seats. ${ok?`A majority, with ${sum-need} to spare.`:`${need-sum} short of a majority.`}</p>
+  <p class="src" style="margin:4px 0 0">${solo?`${esc(rp(s.list[0][0]).abbr)} would govern alone on these numbers.`:pairs.length?`Two-party majorities: ${pairs.slice(0,4).map(p=>`<button class="plink" data-rpair="${p[0]},${p[1]}">${esc(rp(p[0]).abbr)} + ${esc(rp(p[1]).abbr)}</button> (${p[2]})`).join(', ')}`:'No two parties reach a majority on these numbers.'}</p></div>`;
+}
+
+/* WhatsApp-friendly text snapshot of one council */
+function shareText(code){
+ const m=R.data.munis[code], s=councilStatus(m), base=base21(code);
+ const rows=byVotes(partyRows(m)).slice(0,5).map(r=>{ const b=base&&base.find(x=>x[0]===r[0]), d=b?r[2]-b[1]:null;
+  return `${rp(r[0]).abbr} ${r[2].toFixed(1)}%${d==null?'':` (${d>=0?'▲':'▼'}${Math.abs(d).toFixed(1)})`}`; });
+ const t=new Date(R.data.report||R.data.fetched).toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
+ return `🗳️ ${muniName(code)}: live results at ${t}, ${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted\n${rows.join(' · ')||'No votes counted yet'}\n${s.text}${base?' (▲▼ vs 2021)':''}\nFollow live: ${SITE}?council=${code}`;
+}
+const shareRow = code => `<div class="share-row"><button class="btn ghost small" data-rwa="${code}">Share on WhatsApp</button>${navigator.share?`<button class="btn ghost small" data-rshare="${code}">Share…</button>`:''}</div>`;
+
+/* "What's changed" feed: compare each update with a compact snapshot of the last one
+   this browser saw, so returning visitors also see what happened while they were away. */
+function snapOf(d){ const m={}; Object.entries(d.munis).forEach(([c,x])=>{ const s=councilStatus(x), l=votesLeader(partyRows(x)); m[c]=[s.k, l?l[0]:null]; }); return {e:d.event, w:d.prog.wards[0], m}; }
+function updateFeed(d){
+ const old=store.get('rSnap',null), snap=snapOf(d); store.set('rSnap',snap);
+ if(!old || old.e!==d.event) return;
+ const feed=store.get('rFeed',[]), t=d.report||d.fetched, ev=[];
+ Object.entries(snap.m).forEach(([c,[k,l]])=>{ const o=old.m[c]; if(!o) return; const m=d.munis[c];
+  if(k!==o[0] && (k==='won'||k==='hung')){ const s=councilStatus(m); ev.push({t,c,big:isMetro(c),m:`${muniName(c)} declared: ${s.text}${s.k==='won'?` with ${s.seats} of ${s.total} seats`:''}`}); }
+  else if(isMetro(c) && l!=null && o[1]!=null && l!==o[1]) ev.push({t,c,big:true,m:`${rp(l).abbr} overtakes ${rp(o[1]).abbr} in ${muniName(c)}`});
+ });
+ const dw=snap.w-old.w;
+ if(dw>0){ const prev=feed[0]; const e={t,w:1,n:dw+(prev&&prev.w&&Date.parse(t)-Date.parse(prev.t)<15*60000?prev.n:0)};
+  e.m=`${e.n} more ward${e.n>1?'s':''} declared (${fmt(snap.w)} of ${fmt(d.prog.wards[1])})`;
+  if(prev&&prev.w&&e.n>dw) feed.shift(); ev.push(e); }
+ if(ev.length) store.set('rFeed', ev.reverse().concat(feed).slice(0,50));
+}
+function feedCard(){
+ const f=store.get('rFeed',[]);
+ const hm=iso=>new Date(iso).toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
+ return `<div class="card" style="margin:0 0 24px"><h3>What's changed</h3>${f.length
+  ?`<ul class="feed" aria-live="polite">${f.slice(0,R.feedAll?50:6).map(x=>`<li class="${x.big?'big':''}"><time datetime="${esc(x.t)}">${hm(x.t)}</time><span>${x.c?`<button class="plink" data-rmuni="${esc(x.c)}">${esc(x.m)}</button>`:esc(x.m)}</span></li>`).join('')}</ul>${f.length>6?`<button class="plink" data-rfeed="1" style="margin-top:8px">${R.feedAll?'Show fewer':`Show all ${f.length}`}</button>`:''}`
+  :`<p class="src" style="margin:0">Councils being declared and lead changes in the metros will appear here as new results come in. Keep this page open; it checks every minute.</p>`}</div>`;
+}
+
 /* ---------- views ---------- */
 function resHeader(){
  const d=R.data, p=d.prog, final=p.vd[1]>0 && p.vd[0]>=p.vd[1], t=d.turnout;
@@ -1430,13 +1542,14 @@ function viewOverview(){
  const top=rows.slice(0,12);
  const yours=store.get('place',null), ym=yours&&MUNIS[yours.m], yd=ym&&d.munis[ym.code];
  return `${yd?`<div class="notice" style="max-width:none"><b>Your council, ${esc(ym.name)}:</b> ${statusPill(councilStatus(yd))} ${pct(yd.prog.vd[0],yd.prog.vd[1]).toFixed(0)}% counted. <button class="plink" data-rmuni="${ym.code}">See its wards</button></div>`:''}
+ ${feedCard()}
  <h3>Who is ahead nationally</h3>
  ${rows.length?`<div class="cmp-scroll"><table class="nt"><thead><tr><th scope="col">Party</th><th scope="col">Share of the vote</th><th scope="col">Wards won</th><th scope="col">Councils won outright</th></tr></thead><tbody>
  ${top.map(r=>{const p=rp(r[0]), ww=wmap.get(r[0]);return `<tr><td>${chip(r[0])}<span class="pname">${esc(p.name)}</span></td>
-  <td class="num"><span class="vbar"><i style="width:${Math.min(100,r[2])}%;background:${p.c}"></i></span> <b>${r[2].toFixed(1)}%</b> <span class="src">${fmt(r[1])}</span></td>
+  <td class="num"><span class="vbar"><i style="width:${Math.min(100,r[2])}%;background:${p.c}"></i></span> <b>${r[2].toFixed(1)}%</b>${swing(r[0],r[2],base21())} <span class="src">${fmt(r[1])}</span></td>
   <td class="num"><b>${ww?fmt(ww.won):0}</b>${ww&&ww.lead?` <span class="src">+${ww.lead} leading</span>`:''}</td>
   <td class="num"><b>${cmap.get(r[0])||0}</b></td></tr>`}).join('')}
- </tbody></table></div>${rows.length>top.length?`<p class="src">${rows.length-top.length} smaller parties and independents not shown.</p>`:''}`
+ </tbody></table></div>${rows.length>top.length?`<p class="src">${rows.length-top.length} smaller parties and independents not shown.</p>`:''}${swingNote()}`
  :`<div class="empty"><p>No votes have been counted yet.</p><p class="src">Results come in district by district through the night. This page checks for new figures every minute.</p></div>`}
  <div class="two" style="margin-top:28px">
   <div class="card"><h3>Metros</h3><ul class="mini">${METRO_ORDER.filter(k=>d.munis[k]).map(k=>{const m=d.munis[k],s=councilStatus(m);return `<li><button data-rmetro="${k}"><span class="nm">${esc(muniName(k))}</span>${statusPill(s)}<span class="stack thin" style="grid-column:1/-1">${(m.res||[]).filter(r=>r[1]).sort((a,b)=>b[1]-a[1]).map(r=>`<i style="width:${r[2]}%;background:${rp(r[0]).c}"></i>`).join('')}</span></button></li>`}).join('')}</ul></div>
@@ -1482,13 +1595,12 @@ function viewMetros(){
  const d=R.data;
  return `<p class="intro">A metro council needs more than half its seats to govern alone. Otherwise parties must form a coalition, and the council elects the mayor.</p>
  <div class="rgrid">${METRO_ORDER.filter(k=>d.munis[k]).map(k=>{const m=d.munis[k], s=councilStatus(m), w=wardTally([k]);
-  const top=(m.res||[]).filter(r=>r[1]).sort((a,b)=>b[1]-a[1]).slice(0,5);
   return `<section class="rcard" id="metro-${k}"><h3>${esc(muniName(k))}<small>${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted</small></h3>
   <div class="big">${s.lead!=null?chip(s.lead):''} ${statusPill(s)}</div>
   <div><div class="lbl">Seats</div>${seatBar(m)}</div>
-  <div><div class="lbl">Party vote</div>${top.length?`<ul class="mini">${top.map(r=>`<li style="display:flex;justify-content:space-between;padding:6px 0">${chip(r[0])}<span class="num">${r[2].toFixed(1)}%${r[5]?` · ${r[5]} seats`:''}</span></li>`).join('')}</ul>`:'<span class="src">No votes counted yet</span>'}</div>
+  <div><div class="lbl">Party vote</div>${voteList(k,5)}</div>
   <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3)}</div>
-  <button class="btn ghost small" data-rmuni="${k}">See all ${w.total} wards</button></section>`}).join('')}</div>`;
+  <div class="share-row" style="margin-top:auto"><button class="btn small" data-rmuni="${k}" data-rcoalgo="1">Wards and coalitions</button><button class="btn ghost small" data-rwa="${k}">Share on WhatsApp</button></div></section>`}).join('')}</div>${swingNote()}`;
 }
 
 function districtsList(){
@@ -1549,7 +1661,10 @@ function viewWards(){
  }
  return picker+`<div class="rcard" style="margin-bottom:18px"><h3>${esc(muniName(R.muni))}<small>${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted</small></h3>
   <p class="place-meta" style="margin:0">${statusPill(s)} <span class="tag">${isMetro(R.muni)?'Metro':'Local council'}</span>${meta&&meta.district?`<span class="tag">${esc(meta.district)} District</span>`:''}<span class="tag">${esc(PROV[m.prov])}</span></p>
-  <div><div class="lbl">Council seats</div>${seatBar(m)}</div></div>
+  <div><div class="lbl">Council seats</div>${seatBar(m)}</div>
+  <div><div class="lbl">Party vote</div>${voteList(R.muni,8)}${swingNote()}</div>
+  ${coalBuilder(R.muni)}
+  ${shareRow(R.muni)}</div>
   <h3>Who is winning each ward</h3>
   <div class="key"><span>Solid top edge: won</span><span>Dashed: leading, still counting</span><span>Tap a ward for details. Tap a party to highlight its wards.</span></div>
   <div class="pchips" role="group" aria-label="Highlight a party">${w.list.map(([id,cnt,o])=>`<button aria-pressed="${R.hl===id}" data-rhl="${id}">${chip(id)} <b>${cnt}</b>${o.lead?` <span class="src">(${o.lead} leading)</span>`:''}</button>`).join('')}${w.total>w.declared+w.leading?`<span class="src" style="align-self:center">${w.total-w.declared-w.leading} wards not in yet</span>`:''}</div>
@@ -1569,7 +1684,7 @@ function renderResults(){
  const views={overview:viewOverview,provinces:viewProvinces,metros:viewMetros,districts:viewDistricts,wards:viewWards};
  if(!views[R.view]) R.view='overview';
  const keepFocus = document.activeElement && document.activeElement.closest && document.activeElement.closest('#s-results') ? document.activeElement : null;
- const sel = keepFocus && ['rview','rward','rhl','rdprov'].map(k=>keepFocus.dataset[k]!==undefined?`[data-${k}="${keepFocus.dataset[k]}"]`:null).find(Boolean);
+ const sel = keepFocus && ['rview','rward','rhl','rdprov','rcoal'].map(k=>keepFocus.dataset[k]!==undefined?`[data-${k}="${keepFocus.dataset[k]}"]`:null).find(Boolean);
  const typing = keepFocus && keepFocus.id==='rq';
  if(typing) return; // don't redraw under someone typing in the council search
  s.innerHTML = head+resHeader()+`<div id="resBody">${views[R.view]()}</div>`+
@@ -1585,7 +1700,12 @@ document.getElementById('s-results').addEventListener('click',e=>{
  if(ds.rdist!==undefined) return setRes({view:'districts', dist:ds.rdist||null});
  if(ds.rdprov!==undefined){ store.set('rDistProv',ds.rdprov); return renderResults(); }
  if(ds.rmetro!==undefined){ setRes({view:'metros'}); const el=document.getElementById('metro-'+ds.rmetro); el&&el.scrollIntoView({block:'start',behavior:'smooth'}); return; }
- if(ds.rmuni!==undefined){ setRes({view:'wards', muni:ds.rmuni, ward:null, hl:null}); document.getElementById('h-results').scrollIntoView({behavior:'smooth'}); return; }
+ if(ds.rmuni!==undefined){ setRes({view:'wards', muni:ds.rmuni, ward:null, hl:null}); const el=ds.rcoalgo&&document.getElementById('coal'); (el||document.getElementById('h-results')).scrollIntoView({behavior:'smooth',block:'start'}); return; }
+ if(ds.rcoal!==undefined){ const k=+ds.rcoal; COAL.sel.has(k)?COAL.sel.delete(k):COAL.sel.add(k); return renderResults(); }
+ if(ds.rpair!==undefined){ COAL.sel=new Set(ds.rpair.split(',').map(Number)); return renderResults(); }
+ if(ds.rwa!==undefined){ window.open('https://wa.me/?text='+encodeURIComponent(shareText(ds.rwa)),'_blank','noopener'); return; }
+ if(ds.rshare!==undefined){ navigator.share({text:shareText(ds.rshare)}).catch(()=>{}); return; }
+ if(ds.rfeed!==undefined){ R.feedAll=!R.feedAll; return renderResults(); }
  if(ds.rward!==undefined){ const k=+ds.rward; return setRes({ward:R.ward===k?null:k}); }
  if(ds.rhl!==undefined){ const k=+ds.rhl; return setRes({hl:R.hl===k?null:k}); }
  if(ds.rcands!==undefined){ candState.view='wards'; candState.code=R.muni; candState.label=muniName(R.muni); candState.ward=+ds.rcands; saveCand(); renderCands(); showTab('cands'); }
@@ -1601,6 +1721,7 @@ document.getElementById('themeBtn').onclick=()=>{
 function renderAll(){renderResults();renderParties();renderCompare();renderPresets();renderSliders();renderRank();renderPeople();renderHow();if(state.mode==='local')renderCands()}
 applyMode();
 if(Date.now()>=POLLS_CLOSE) showTab('results');
+(()=>{ const c=new URLSearchParams(location.search).get('council'); if(c && /^[A-Z]{2,3}\d{0,3}$/i.test(c)){ Object.assign(R,{view:'wards', muni:c.toUpperCase(), ward:null, hl:null}); showTab('results'); } })();
 loadResults();
 setInterval(()=>{ if(document.visibilityState==='visible') loadResults(); }, 60000);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && Date.now()-R.loadedAt>60000) loadResults(); });

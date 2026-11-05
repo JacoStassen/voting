@@ -10,7 +10,7 @@ Usage:
   python3 scripts/fetch_results.py                      # 2026 (event 1887)
   python3 scripts/fetch_results.py --event 1091 --year 2021 --out /tmp/r.json
 """
-import argparse, datetime, json, os, re, sys, time, urllib.error, urllib.request
+import argparse, concurrent.futures, datetime, gzip, json, os, re, sys, time, urllib.error, urllib.request
 
 BASE = "https://results.elections.org.za/dashboards/lge/MapsJason"
 UA = "KnowYourBallot-results-relay/1.0 (+https://voting.stassen.org.za)"
@@ -28,9 +28,13 @@ def get_json(url, tries=3):
     for i in range(tries):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json, text/javascript, */*; q=0.01",
+                                                      "Accept-Encoding": "gzip",
                                                       "Referer": "https://results.elections.org.za/dashboards/lge/"})
             with urllib.request.urlopen(req, timeout=60) as r:
-                raw = r.read().decode("utf-8-sig")
+                raw = r.read()
+                if r.headers.get("Content-Encoding") == "gzip":
+                    raw = gzip.decompress(raw)
+                raw = raw.decode("utf-8-sig")
             return json.loads(raw)
         except urllib.error.HTTPError as e:
             if e.code == 404:
@@ -81,6 +85,45 @@ def turnout(rows):
     b = (rows or [{}])[0]
     return {"reg": b.get("RegisteredVoters", 0), "cast": b.get("TotalVotesCast", 0),
             "valid": b.get("ValidVotesCast", 0), "spoilt": b.get("SpoiltVotes", 0)}
+
+
+FULL_EVERY = 300   # refetch a non-metro council's full party list at most every 5 minutes
+FULL_MAX = 40      # and at most this many full files per run (each is ~100-300 KB gzipped)
+
+
+def fetch_full(base, data, prev, used):
+    """The province feed lists only each council's top three parties. The per-council
+    file (EEID...Munic{id}.js) has every party but is large, so fetch it only for
+    councils whose count moved, metros first, and reuse the last copy otherwise."""
+    now = int(time.time())
+    pm = (prev or {}).get("munis", {})
+    todo = []
+    for code, m in data["munis"].items():
+        old = pm.get(code) or {}
+        if old.get("all"):
+            m["all"], m["ft"] = old["all"], old.get("ft", 0)
+            used.update(r[0] for r in m["all"])
+        if not m.get("mid") or not m["prog"]["vd"][0]:
+            continue
+        moved = old.get("prog", {}).get("vd") != m["prog"]["vd"] or old.get("prog", {}).get("seats") != m["prog"]["seats"]
+        if not m.get("all") or (moved and (code in METRO_PREFIX or now - m.get("ft", 0) >= FULL_EVERY)):
+            todo.append(code)
+    todo.sort(key=lambda c: (c not in METRO_PREFIX, data["munis"][c].get("ft", 0)))
+    todo = todo[:FULL_MAX]
+
+    def one(code):
+        return code, get_json(f"{base}Munic{data['munis'][code]['mid']}.js", tries=2)
+
+    with concurrent.futures.ThreadPoolExecutor(6) as ex:
+        for code, full in ex.map(one, todo):
+            rows = (full or {}).get("PartyBallotResults")
+            if not rows:
+                continue
+            res = [r for r in results(rows, set()) if r[1] or r[5]][:30]
+            used.update(r[0] for r in res)
+            data["munis"][code]["all"], data["munis"][code]["ft"] = res, now
+    if todo:
+        print(f"full party lists: fetched {len(todo)} councils", file=sys.stderr)
 
 
 def main():
@@ -147,6 +190,7 @@ def main():
                 "name": name.strip() or code, "prov": key, "prog": prog(m),
                 "turnout": turnout(m.get("PartyBallotResults")),
                 "res": results(m.get("PartyBallotResults"), used), "wards": {},
+                "mid": m.get("MunicipalityID"),
             }
             all_wards.extend(m.get("WardResults", []))
         # The IEC province file lists every ward under one municipality, so assign
@@ -162,6 +206,8 @@ def main():
         data["prov"].append({"id": pid, "code": key, "name": p.get("Province"), "prog": prog(p),
                              "turnout": turnout(p.get("PartyBallotResults")),
                              "res": results(p.get("PartyBallotResults"), used), "munis": codes})
+
+    fetch_full(base, data, prev, used)
 
     data["parties"] = {str(i): [pmeta[i]["Name"], pmeta[i]["PartyFullName"].title(), pmeta[i]["sWebColour"]]
                        for i in sorted(used) if i in pmeta}
