@@ -6,6 +6,16 @@
 <meta name="color-scheme" content="light dark">
 <title>Know Your Ballot: South Africa 2026</title>
 <meta name="description" content="Compare South Africa's political parties, find who is standing in your ward, and weigh parties against biblical principles of leadership.">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#EEF1EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15141D" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="Know your ballot">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
@@ -218,6 +228,28 @@ table.wt td.num{white-space:nowrap;font-variant-numeric:tabular-nums}
 .live26 .live-dot{margin-top:7px;flex:none}
 .backfab{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:40;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:11px 18px;border:2px solid var(--ink);border-radius:99px;background:var(--ink);color:var(--paper);font:inherit;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 .backfab[hidden]{display:none}
+/* Tracked areas */
+.trkpanel{margin:0 0 22px}
+.trkpanel-h{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:0 0 10px}
+.trkpanel-h h3{margin:0 auto 0 0;font-size:1.08rem}
+.trkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.trk{position:relative;border:1px solid var(--line);border-top:5px solid var(--c);border-radius:8px;background:var(--sheet);min-width:0}
+.trk-main{display:flex;flex-direction:column;gap:3px;width:100%;padding:10px 36px 12px 14px;border:0;background:none;color:var(--ink);text-align:left;font:inherit;cursor:pointer;border-radius:8px}
+.trk-main:hover{background:var(--paper)}
+.trk-k{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trk-t{font-family:var(--display);font-weight:800;font-size:1.12rem;line-height:1.2}
+.trk-lead{font-size:1rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.trk-s{font-size:.82rem;color:var(--muted)}
+.trk .bar{margin-top:5px}
+.trk-x{position:absolute;top:6px;right:6px;width:30px;height:30px;border:0;border-radius:50%;background:none;color:var(--muted);font-size:1.25rem;line-height:1;cursor:pointer}
+.trk-x:hover{background:var(--paper);color:var(--ink)}
+.trkbtn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--sheet);color:var(--ink);border-radius:99px;padding:4px 12px;font:inherit;font-size:.85rem;font-weight:700;cursor:pointer;white-space:nowrap;vertical-align:middle}
+.trkbtn[aria-pressed="true"]{border-color:var(--violet);background:var(--violet-soft)}
+.trktip{font-size:.88rem;color:var(--muted);margin:0 0 18px}
+@media (max-width:560px){.trkgrid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:82%;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px;-webkit-overflow-scrolling:touch}.trk{scroll-snap-align:start}}
+.pipbody{margin:0;padding:10px;background:var(--paper);color:var(--ink);font-family:var(--body)}
+.pip .trk{margin:0 0 8px}
+.pip-h{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:0 2px 8px;font-size:.88rem}
 body.hasback{padding-bottom:76px}
 .headline{border-left:8px solid var(--c);background:var(--sheet);border-radius:0 10px 10px 0;padding:16px 20px;margin:0 0 22px;box-shadow:0 1px 0 var(--line)}
 .headline .hl1{font-family:var(--display);font-weight:700;font-size:clamp(1.15rem,2.4vw,1.45rem);line-height:1.35;margin:0 0 6px;text-wrap:balance}
@@ -1463,6 +1495,7 @@ async function loadResults(){
   R.data = got; R.err = null;
   try{ updateFeed(got); }catch(e){}
   const dl=document.getElementById('wonDlg'); if(dl && dl.open) renderWon(false);
+  onResultsLoaded();
  }catch(e){ R.err = e; }
  R.loadedAt = Date.now(); R.busy=false;
  const pill=document.getElementById('livePill');
@@ -1631,7 +1664,7 @@ function updateFeed(d){
 function headline(){
  const d=R.data, rows=byVotes(d.nat), a=rows[0], b=rows[1]; if(!a) return '';
  const c=councilTally(Object.keys(d.munis)), dec=c.list.reduce((n,x)=>n+x[1],0)+c.hung;
- return `<div class="headline" style="--c:${rp(a[0]).c}"><p class="hl1">${chip(a[0])} leads the national vote with ${a[2].toFixed(1)}%${b?`, ${a[2]-b[2]<2?'narrowly ':''}ahead of ${chip(b[0])} on ${b[2].toFixed(1)}%`:''}.</p>
+ return `<div class="headline" style="--c:${rp(a[0]).c}"><div style="float:right;margin:0 0 6px 12px">${trackBtn({t:'nat'})}</div><p class="hl1">${chip(a[0])} leads the national vote with ${a[2].toFixed(1)}%${b?`, ${a[2]-b[2]<2?'narrowly ':''}ahead of ${chip(b[0])} on ${b[2].toFixed(1)}%`:''}.</p>
   <p class="hl2">${dec?`<b>${fmt(dec)}</b> of ${fmt(d.prog.munis[1])} councils have a result: ${c.list.map(([id,n])=>wonBtn(id,'councils','',`${esc(rp(id).abbr)} <b>${n}</b>`,`Which councils ${rp(id).abbr} won`)).join(', ')}${c.hung?`, <b>${c.hung}</b> hung`:''}.`:'No council has a final result yet.'} ${pct(d.prog.vd[0],d.prog.vd[1]).toFixed(0)}% of voting districts counted.</p></div>`;
 }
 function feedCard(){
@@ -1785,6 +1818,7 @@ function resHeader(){
   <div class="tile"><div class="k">Councils complete</div><div class="v">${fmt(p.munis[0])}</div><span class="bar"><i style="width:${pct(p.munis[0],p.munis[1])}%"></i></span><div class="s">of ${fmt(p.munis[1])}; ${p.hung} hung so far</div></div>
   <div class="tile"><div class="k">Seats allocated</div><div class="v">${fmt(p.seats[0])}</div><span class="bar"><i style="width:${pct(p.seats[0],p.seats[1])}%"></i></span><div class="s">of ${fmt(p.seats[1])} council seats; ${fmt(t.reg)} registered voters</div></div>
  </div>
+ ${trackPanel()}
  <div class="res-segbar"><div class="seg res-seg" role="group" aria-label="Results view">${[['overview','Overview'],['provinces','Provinces'],['metros','Metros'],['districts','Districts'],['wards','Wards']].map(([k,l])=>`<button aria-pressed="${R.view===k}" data-rview="${k}">${l}</button>`).join('')}</div></div>`;
 }
 
@@ -1832,6 +1866,7 @@ function viewProvinces(){
   const l=votesLeader(p.res), codes=p.munis.slice().sort((a,b)=>(isMetro(b)-isMetro(a))||muniName(a).localeCompare(muniName(b)));
   return `<nav class="crumbs" aria-label="Breadcrumb"><button data-rprov="">All provinces</button><span aria-hidden="true">›</span><b>${esc(PROV[p.code])}</b></nav>
   <div class="rcard" style="margin-bottom:20px"><h3>${esc(PROV[p.code])}<small>${p.prog?pct(p.prog.vd[0],p.prog.vd[1]).toFixed(0)+'% counted':''}</small></h3>
+   <div>${trackBtn({t:'prov',k:p.code})}</div>
    <div><div class="lbl">Most votes</div><div class="big">${l?chip(l[0],` ${l[2].toFixed(1)}%`):'<span class="src">No results yet</span>'}</div></div>
    <div><div class="lbl">Wards won or leading</div>${stack(wardTally(p.munis).list.map(x=>[x[0],x[1]]),wardTally(p.munis).total)}${wardLine(wardTally(p.munis),6,'prov:'+p.code)}</div>
    <div><div class="lbl">Councils</div>${councilLine(councilTally(p.munis),'prov:'+p.code)}</div></div>
@@ -1856,7 +1891,7 @@ function viewMetros(){
   <div><div class="lbl">Seats</div>${seatBar(m)}</div>
   <div><div class="lbl">Party vote</div>${voteList(k,5)}</div>
   <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3,'muni:'+k)}</div>
-  <div class="share-row" style="margin-top:auto"><button class="btn small" data-rmuni="${k}" data-rcoalgo="1">Wards and coalitions</button><button class="btn ghost small" data-rwa="${k}">Share on WhatsApp</button></div></section>`}).join('')}</div>${swingNote()}`;
+  <div class="share-row" style="margin-top:auto"><button class="btn small" data-rmuni="${k}" data-rcoalgo="1">Wards and coalitions</button><button class="btn ghost small" data-rwa="${k}">Share on WhatsApp</button>${trackBtn({t:'muni',k})}</div></section>`}).join('')}</div>${swingNote()}`;
 }
 
 function districtsList(){
@@ -1871,6 +1906,7 @@ function viewDistricts(){
   const w=wardTally(dd.codes);
   return `<nav class="crumbs" aria-label="Breadcrumb"><button data-rdist="">All districts</button><span aria-hidden="true">›</span><span>${esc(PROV[dd.prov])}</span><span aria-hidden="true">›</span><b>${esc(dd.name)}</b></nav>
   <div class="rcard" style="margin-bottom:20px"><h3>${esc(dd.name)} District<small>${dd.codes.length} local councils</small></h3>
+   <div>${trackBtn({t:'dist',k:dd.prov+'|'+dd.name})}</div>
    <div><div class="lbl">Wards won or leading</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,6,'dist:'+dd.prov+'|'+dd.name)}</div>
    <div><div class="lbl">Local councils won outright</div>${councilLine(councilTally(dd.codes),'dist:'+dd.prov+'|'+dd.name)}</div></div>
   ${(()=>{ const sm=sumCouncils(dd.codes), bt=B21&&dd.codes.reduce((a,c)=>{const x=(B21.munis[c]||{}).t; return x?[a[0]+x[0],a[1]+x[1]]:a},[0,0]); return turnoutCard(dd.name+' District', sm.t, sm.vd, sm.rows, bt); })()}
@@ -1911,15 +1947,15 @@ function viewWards(){
  if(R.ward!=null){
   const wr=m.wards[R.ward];
   if(wr){ const p=rp(wr[0]), c=winnerCandidate(R.muni,R.ward,wr[0]);
-   detail=`<div class="wdetail" style="--c:${p.c}" aria-live="polite"><h3>Ward ${R.ward}, ${esc(muniName(R.muni))}</h3>
+   detail=`<div class="wdetail" style="--c:${p.c}" aria-live="polite"><h3>Ward ${R.ward}, ${esc(muniName(R.muni))} ${trackBtn({t:'ward',k:R.muni,w:R.ward})}</h3>
     <p><b>${esc(p.name)}</b> ${wr[2]?'won':'is leading'} with <b>${wr[1].toFixed(1)}%</b> of the ward vote.${wr[2]?'':' Counting is still under way here.'}</p>
     ${(m.wt||{})[R.ward]?(([n,got,all])=>`<p class="tline"><b>${fmt(n)}</b> valid ward ballots counted${got<all?`, from ${got} of ${all} voting districts`:''}. The IEC doesn't publish registered voters per ward, so ward turnout isn't available.</p>`)(m.wt[R.ward]):''}
     ${c?`<p>Candidate: <b>${esc(tcase(c[2]))} ${esc(tcase(c[1]))}</b>${c[3]?`, ${c[3]}`:''}</p>`:''}
     <p>${R.data.year==='2026'&&WBY[R.muni]?`<button class="plink" data-rcands="${R.ward}">See every candidate in this ward</button>`:''}${p.site?` · <button class="plink" data-goparty="${p.site.id}">About the ${esc(p.abbr)}</button>`:''}</p></div>`;
-  } else detail=`<div class="wdetail" style="--c:var(--line)"><h3>Ward ${R.ward}, ${esc(muniName(R.muni))}</h3><p>No result for this ward yet.</p></div>`;
+  } else detail=`<div class="wdetail" style="--c:var(--line)"><h3>Ward ${R.ward}, ${esc(muniName(R.muni))} ${trackBtn({t:'ward',k:R.muni,w:R.ward})}</h3><p>No result for this ward yet.</p></div>`;
  }
  return picker+`<div class="rcard" style="margin-bottom:18px"><h3>${esc(muniName(R.muni))}<small>${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted</small></h3>
-  <p class="place-meta" style="margin:0">${statusPill(s)} <span class="tag">${isMetro(R.muni)?'Metro':'Local council'}</span>${meta&&meta.district?`<span class="tag">${esc(meta.district)} District</span>`:''}<span class="tag">${esc(PROV[m.prov])}</span></p>
+  <p class="place-meta" style="margin:0">${trackBtn({t:'muni',k:R.muni})} ${statusPill(s)} <span class="tag">${isMetro(R.muni)?'Metro':'Local council'}</span>${meta&&meta.district?`<span class="tag">${esc(meta.district)} District</span>`:''}<span class="tag">${esc(PROV[m.prov])}</span></p>
   <div><div class="lbl">Council seats</div>${seatBar(m)}</div>
   <div><div class="lbl">Party vote</div>${voteList(R.muni,8)}${swingNote()}</div>
   ${coalBuilder(R.muni)}
@@ -1944,7 +1980,7 @@ function renderResults(){
  const views={overview:viewOverview,provinces:viewProvinces,metros:viewMetros,districts:viewDistricts,wards:viewWards};
  if(!views[R.view]) R.view='overview';
  const keepFocus = document.activeElement && document.activeElement.closest && document.activeElement.closest('#s-results') ? document.activeElement : null;
- const sel = keepFocus && ['rview','rward','rhl','rdprov','rcoal','ivoted'].map(k=>keepFocus.dataset[k]!==undefined?`[data-${k}="${keepFocus.dataset[k]}"]`:null).find(Boolean);
+ const sel = keepFocus && ['rview','rward','rhl','rdprov','rcoal','ivoted','trk','trkrm'].map(k=>keepFocus.dataset[k]!==undefined?`[data-${k}="${keepFocus.dataset[k]}"]`:null).find(Boolean);
  const typing = keepFocus && keepFocus.id==='rq';
  if(typing) return; // don't redraw under someone typing in the council search
  s.innerHTML = head+resHeader()+`<div id="resBody">${views[R.view]()}</div>`+
@@ -1968,11 +2004,130 @@ document.getElementById('s-results').addEventListener('click',e=>{
  if(ds.rshare!==undefined){ navigator.share({text:shareText(ds.rshare)}).catch(()=>{}); return; }
  if(ds.rfeed!==undefined){ R.feedAll=!R.feedAll; return renderResults(); }
  if(ds.rwon!==undefined) return openWon(+ds.rwon, ds.rwk, ds.rscope);
+ if(ds.trk!==undefined) return toggleTrack(JSON.parse(ds.trk));
+ if(ds.trkrm!==undefined) return toggleTrack(JSON.parse(ds.trkrm));
+ if(ds.trkgo!==undefined) return goTrack(JSON.parse(ds.trkgo));
+ if(ds.trkpip!==undefined) return popOut().catch(e=>{ console.warn('Pop-out window failed:', e); t.textContent='Pop-out not available here'; t.disabled=true; });
+ if(ds.trkalert!==undefined) return toggleAlerts();
  if(ds.ivoted!==undefined){ const v=ds.ivoted==='1', cur=store.get('iVoted',null); store.set('iVoted', cur===v?null:v); return renderResults(); }
  if(ds.rward!==undefined){ const k=+ds.rward; return setRes({ward:R.ward===k?null:k}); }
  if(ds.rhl!==undefined){ const k=+ds.rhl; return setRes({hl:R.hl===k?null:k}); }
  if(ds.rcands!==undefined){ candState.view='wards'; candState.code=R.muni; candState.label=muniName(R.muni); candState.ward=+ds.rcands; saveCand(); renderCands(); showTab('cands'); }
 });
+
+/* ============ TRACKING ============
+   People can pin areas (the country, a province, district, council or ward) as live
+   tiles. Websites can't create iOS Live Activities or Android live notifications, so
+   the closest we offer is: the tiles here, a floating pop-out window (Document
+   Picture-in-Picture, Chrome and Edge on computers), alerts when a tracked area
+   changes, and the % counted as a badge on the installed app's icon. */
+const TRK = {list:store.get('track',[]), pip:null, max:6};
+const trkId = x => x.t+':'+(x.k||'')+(x.w!=null?':'+x.w:'');
+const isTracked = x => TRK.list.some(y=>trkId(y)===trkId(x));
+const trkAttr = x => esc(JSON.stringify(x));
+function trackBtn(x){ const on=isTracked(x); return `<button class="trkbtn" aria-pressed="${on}" data-trk="${trkAttr(x)}">${on?'<span aria-hidden="true">★</span> Tracking':'<span aria-hidden="true">☆</span> Track live'}</button>`; }
+function declaredIn(codes){ const c=councilTally(codes); return c.list.reduce((a,y)=>a+y[1],0)+c.hung; }
+function trackInfo(x){
+ const d=R.data; if(!d) return null;
+ if(x.t==='nat') return {title:'South Africa', sub:'Whole country', lead:byVotes(d.nat)[0], counted:pct(d.prog.vd[0],d.prog.vd[1])/100,
+  status:`${declaredIn(Object.keys(d.munis))} of ${d.prog.munis[1]} councils have a result`, T:turnoutOf(d.turnout,d.prog.vd), go:{view:'overview'}, url:'/?tab=results'};
+ if(x.t==='prov'){ const p=d.prov.find(y=>y.code===x.k); if(!p) return null;
+  return {title:PROV[x.k], sub:'Province', lead:votesLeader(p.res), counted:p.prog?pct(p.prog.vd[0],p.prog.vd[1])/100:0,
+   status:`${declaredIn(p.munis)} of ${p.munis.length} councils have a result`, T:turnoutOf(p.turnout,p.prog&&p.prog.vd), go:{view:'provinces',prov:x.k}, url:'/?tab=results'}; }
+ if(x.t==='dist'){ const dd=districtsList().find(y=>y.prov+'|'+y.name===x.k); if(!dd) return null; const sm=sumCouncils(dd.codes);
+  return {title:dd.name+' District', sub:PROV[dd.prov], lead:byVotes(sm.rows)[0], counted:sm.vd[1]?sm.vd[0]/sm.vd[1]:0,
+   status:`${declaredIn(dd.codes)} of ${dd.codes.length} councils have a result`, T:turnoutOf(sm.t,sm.vd), go:{view:'districts',dist:x.k}, url:'/?tab=results'}; }
+ if(x.t==='muni'){ const m=d.munis[x.k]; if(!m) return null; const s=councilStatus(m);
+  return {title:muniName(x.k), sub:isMetro(x.k)?'Metro':muniTag(x.k), lead:byVotes(partyRows(m))[0], counted:pct(m.prog.vd[0],m.prog.vd[1])/100,
+   status:s.text, k:s.k, T:turnoutOf(m.turnout,m.prog.vd), go:{view:'wards',muni:x.k,ward:null}, url:'/?council='+x.k}; }
+ if(x.t==='ward'){ const m=d.munis[x.k]; if(!m) return null; const wr=m.wards[x.w], wt=(m.wt||{})[x.w];
+  return {title:`Ward ${x.w}`, sub:muniName(x.k), lead:wr?[wr[0],0,wr[1]]:null, counted:wt?wt[1]/wt[2]:(wr&&wr[2]?1:0),
+   status:wr?`${rp(wr[0]).abbr} ${wr[2]?'won':'leading'}`:'No votes counted yet', k:wr?(wr[2]?'won':'lead'):'wait', ballots:wt&&wt[0], go:{view:'wards',muni:x.k,ward:x.w}, url:'/?council='+x.k}; }
+ return null;
+}
+function trackTile(x, pip){
+ const i=trackInfo(x); if(!i) return '';
+ const p=i.lead&&rp(i.lead[0]), c=Math.min(1,i.counted||0);
+ return `<div class="trk" style="--c:${p?p.c:'var(--line)'}"><button class="trk-main" data-trkgo="${trkAttr(x)}" aria-label="${esc(i.title+', '+i.sub+'. '+i.status)}">
+   <span class="trk-k">${esc(i.sub)}</span><span class="trk-t">${esc(i.title)}</span>
+   <span class="trk-lead">${p?`${chip(i.lead[0])} <b>${i.lead[2].toFixed(1)}%</b>`:'<span class="src">Waiting for votes</span>'}</span>
+   <span class="trk-s">${esc(i.status)}</span>
+   <span class="bar"><i style="width:${(c*100).toFixed(1)}%"></i></span>
+   <span class="trk-s">${(c*100).toFixed(0)}% counted${i.T&&i.T.voters?` · turnout ${i.T.final?'':'~'}${pctTxt(i.T.rate)}`:''}${i.ballots?` · ${fmt(i.ballots)} ballots`:''}</span></button>
+   ${pip?'':`<button class="trk-x" data-trkrm="${trkAttr(x)}" aria-label="Stop tracking ${esc(i.title)}">×</button>`}</div>`;
+}
+const canPip = () => 'documentPictureInPicture' in window;
+const canAlert = () => 'Notification' in window;
+const alertsOn = () => store.get('trkAlert',false) && canAlert() && Notification.permission==='granted';
+function trackPanel(){
+ if(!TRK.list.length) return `<p class="trktip"><span aria-hidden="true">☆</span> Tap <b>Track live</b> on the country, a province, district, council or ward to pin it here${canPip()?', pop it out into a floating window':''}${canAlert()?' and get alerts when it changes':''}.</p>`;
+ const al=alertsOn();
+ return `<section class="trkpanel" aria-label="Areas you're tracking"><div class="trkpanel-h"><h3>Tracking</h3>
+  ${canPip()?`<button class="btn ghost small" data-trkpip="1">${TRK.pip?'Pop-out is open':'Pop out'}</button>`:''}
+  ${canAlert()?`<button class="btn ghost small" data-trkalert="1" aria-pressed="${al}">${al?'🔔 Alerts on':'🔕 Turn on alerts'}</button>`:''}</div>
+  <div class="trkgrid">${TRK.list.map(x=>trackTile(x)).join('')}</div>
+  ${al?`<p class="src" style="margin:8px 0 0">You'll get an alert when a tracked area is declared, a ward is won, or the lead changes, while this site is open. Phones pause websites in the background, so keep it open (or add it to your home screen) to keep updates coming.</p>`:''}</section>`;
+}
+function toggleTrack(x){
+ if(isTracked(x)) TRK.list=TRK.list.filter(y=>trkId(y)!==trkId(x));
+ else { if(TRK.list.length>=TRK.max) TRK.list.shift(); TRK.list.push(x); }
+ store.set('track',TRK.list); trackSigs(false); renderResults(); paintPip(); paintBadge();
+}
+function goTrack(x){
+ const i=trackInfo(x); if(!i) return;
+ navGo(()=>{ Object.assign(R,{prov:null,dist:null,ward:null,hl:null},i.go); store.set('rView',R.view); store.set('rProv',R.prov); store.set('rDist',R.dist); store.set('rMuni',R.muni); showTab0('results'); renderResults(); });
+ setTimeout(()=>{ const el=document.querySelector('.wdetail')||document.getElementById('h-results'); el&&el.scrollIntoView({block:'start',behavior:'smooth'}); },60);
+}
+/* Alerts: compare each tracked area with what we saw last time */
+function trackSigs(notify){
+ const old=store.get('trkSig',{}), now={};
+ TRK.list.forEach(x=>{ const i=trackInfo(x); if(!i) return; const id=trkId(x);
+  const sig={l:i.lead?i.lead[0]:null, k:i.k||null, done:i.counted>=1};
+  now[id]=sig; const o=old[id]; if(!notify || !o) return;
+  let msg=null;
+  if(sig.k!==o.k && (sig.k==='won'||sig.k==='hung')) msg = x.t==='ward' ? `${i.status} with ${i.lead[2].toFixed(1)}%` : i.status;
+  else if(sig.l!=null && o.l!=null && sig.l!==o.l) msg = `${rp(sig.l).abbr} takes the lead from ${rp(o.l).abbr}`;
+  else if(sig.done && !o.done) msg = 'Counting complete';
+  if(msg) sendAlert(x.t==='ward'?`${i.title}, ${i.sub}`:i.title, msg, i.url, id);
+ });
+ store.set('trkSig', now);
+}
+async function sendAlert(title, body, url, tag){
+ if(!alertsOn()) return;
+ const opts={body, icon:'icons/icon-192.png', badge:'icons/icon-192.png', tag, data:{url}};
+ try{ const reg=navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if(reg){ await reg.showNotification(title, opts); return; } }catch(e){}
+ try{ const n=new Notification(title, opts); n.onclick=()=>{ window.focus(); n.close(); }; }catch(e){}
+}
+async function toggleAlerts(){
+ if(alertsOn()){ store.set('trkAlert',false); return renderResults(); }
+ const p = Notification.permission==='granted' ? 'granted' : await Notification.requestPermission();
+ store.set('trkAlert', p==='granted');
+ if(p==='denied') alert("Alerts are blocked for this site. You can allow them in your browser's site settings.");
+ renderResults();
+}
+/* Badge on the installed app's icon: % counted for the first tracked area */
+function paintBadge(){
+ if(!('setAppBadge' in navigator)) return;
+ const i=TRK.list[0] && trackInfo(TRK.list[0]);
+ try{ (i && i.counted>0 ? navigator.setAppBadge(Math.round(Math.min(1,i.counted)*100)) : navigator.clearAppBadge()).catch(()=>{}); }catch(e){}
+}
+/* Pop-out: a small always-on-top window with the tracked tiles */
+async function popOut(){
+ if(TRK.pip){ try{ TRK.pip.focus(); }catch(e){} return; }
+ const w=await documentPictureInPicture.requestWindow({width:330, height:Math.min(620, 70+Math.max(1,TRK.list.length)*138)});
+ document.querySelectorAll('style, link[rel="stylesheet"]').forEach(n=>w.document.head.appendChild(n.cloneNode(true)));
+ const th=document.documentElement.dataset.theme; if(th) w.document.documentElement.dataset.theme=th;
+ w.document.body.className='pipbody';
+ w.document.body.addEventListener('click', e=>{ const t=e.target.closest('[data-trkgo]'); if(t){ window.focus(); goTrack(JSON.parse(t.dataset.trkgo)); } });
+ w.addEventListener('pagehide', ()=>{ TRK.pip=null; renderResults(); });
+ TRK.pip=w; paintPip(); renderResults();
+}
+function paintPip(){
+ if(!TRK.pip) return; const d=TRK.pip.document; d.title='Live results';
+ d.body.innerHTML=`<div class="pip"><div class="pip-h"><span><span class="live-dot" aria-hidden="true"></span><b>Live results</b></span><span class="src">${R.data?'IEC update '+esc(tm(R.data.report)):''}</span></div>
+  ${TRK.list.length?TRK.list.map(x=>trackTile(x,true)).join(''):'<p class="src">Track an area on the Live results page to see it here.</p>'}</div>`;
+}
+function onResultsLoaded(){ try{ trackSigs(true); paintPip(); paintBadge(); }catch(e){} }
 
 /* Sticky results bar: track the tab bar's height and mark the bar once it's pinned */
 function segbarCheck(){
@@ -2047,11 +2202,16 @@ document.getElementById('themeBtn').onclick=()=>{
 function renderAll(){renderResults();renderParties();renderCompare();renderPresets();renderSliders();renderRank();renderPeople();renderHow();if(state.mode==='local')renderCands()}
 applyMode();
 if(Date.now()>=POLLS_CLOSE) showTab('results');
+(()=>{ const t=new URLSearchParams(location.search).get('tab'); const b=t && /^[a-z]+$/.test(t) && document.querySelector(`.tab[data-tab="${t}"]`); if(b && !b.hidden) showTab(t); })();
 (()=>{ const c=new URLSearchParams(location.search).get('council'); if(c && /^[A-Z]{2,3}\d{0,3}$/i.test(c)){ Object.assign(R,{view:'wards', muni:c.toUpperCase(), ward:null, hl:null}); showTab('results'); } })();
 try{ const h=history.state; history.replaceState({...(h||{}), ...navSnap(), y:scrollY, depth:(h&&h.depth)||0}, ''); }catch(e){}
 NAV.ready=true; paintBack();
 loadResults();
-setInterval(()=>{ if(document.visibilityState==='visible') loadResults(); }, 60000);
+setInterval(()=>{ if(document.visibilityState==='visible' || TRK.pip || store.get('trkAlert',false)) loadResults(); }, 60000);
+if('serviceWorker' in navigator){
+ navigator.serviceWorker.register('sw.js').catch(()=>{});
+ navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.type==='open' && e.data.url) location.href=e.data.url; });
+}
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && Date.now()-R.loadedAt>60000) loadResults(); });
 </script>
 </body>
