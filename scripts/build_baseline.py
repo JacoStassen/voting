@@ -19,15 +19,23 @@ def rows(prs, min_pct=0.3):
     return sorted([r for r in out if r[1] >= min_pct or r[2]], key=lambda r: -r[1])
 
 
+def turnout(prs):
+    """[registered, ballots cast] from a results block."""
+    b = (prs or [{}])[0]
+    return [b.get("RegisteredVoters", 0), b.get("TotalVotesCast", 0)]
+
+
 def main():
     base = f"{BASE}/{YEAR}/EEID{EVENT}"
     nat = get_json(f"{base}LiteMapsNational.js") or sys.exit("national feed unavailable")
     plist = {p["ID"]: p for p in get_json(f"{BASE}/2016/PartyList.js") or []}
-    out = {"year": YEAR, "nat": rows(nat.get("PartyBallotResults"), 0.1), "prov": {}, "munis": {}}
+    out = {"year": YEAR, "nat": rows(nat.get("PartyBallotResults"), 0.1), "prov": {}, "munis": {},
+           "t": {"nat": turnout(nat.get("PartyBallotResults")), "prov": {}}}
     todo = []
     for pid in range(1, 10):
         p = get_json(f"{base}Province{pid}.js") or sys.exit(f"province {pid} unavailable")
         out["prov"][IEC_PROV[pid]] = rows(p.get("PartyBallotResults"), 0.1)
+        out["t"]["prov"][IEC_PROV[pid]] = turnout(p.get("PartyBallotResults"))
         for m in p.get("MunicipalityResults", []):
             code = m.get("Municipality", "").partition(" - ")[0].strip()
             todo.append((code, m["MunicipalityID"], m.get("SeatsExpected", 0)))
@@ -41,7 +49,8 @@ def main():
             if not full:
                 print(f"warn: no data for {code}", file=sys.stderr)
                 continue
-            out["munis"][code] = {"seats": seats, "res": rows(full.get("PartyBallotResults"))}
+            out["munis"][code] = {"seats": seats, "res": rows(full.get("PartyBallotResults")),
+                                  "t": turnout(full.get("PartyBallotResults"))}
             print(f"{i}/{len(todo)} {code}", file=sys.stderr, end="\r")
 
     used = {r[0] for r in out["nat"]} | {r[0] for v in out["prov"].values() for r in v} | \

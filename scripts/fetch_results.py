@@ -102,6 +102,8 @@ def fetch_full(base, data, prev, used):
         old = pm.get(code) or {}
         if old.get("all"):
             m["all"], m["ft"] = old["all"], old.get("ft", 0)
+            if old.get("wt"):
+                m["wt"] = old["wt"]
             used.update(r[0] for r in m["all"])
         if not m.get("mid") or not m["prog"]["vd"][0]:
             continue
@@ -122,6 +124,16 @@ def fetch_full(base, data, prev, used):
             res = [r for r in results(rows, set()) if r[1] or r[5]][:30]
             used.update(r[0] for r in res)
             data["munis"][code]["all"], data["munis"][code]["ft"] = res, now
+            # Ward turnout: the feed has no registered voters per ward, only votes, so
+            # keep valid ward ballots and how many voting districts have reported.
+            wt = {}
+            for w in full.get("WardResults") or []:
+                vds = w.get("VotingDistrictResults") or []
+                got = sum(1 for v in vds if any(b.get("TotalValidVotes") for b in v.get("PartyBallotResults") or []))
+                ballots = sum(b.get("WardVotes", 0) for b in w.get("PartyBallotResults") or [])
+                if ballots:
+                    wt[str(int(str(w.get("WardID"))[-3:]))] = [ballots, got, len(vds)]
+            data["munis"][code]["wt"] = wt
     if todo:
         print(f"full party lists: fetched {len(todo)} councils", file=sys.stderr)
 

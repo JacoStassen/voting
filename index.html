@@ -343,6 +343,26 @@ table.nt td.num,table.ct td.num{font-variant-numeric:tabular-nums;white-space:no
 .wonrow .wchips{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:5px}
 .wchip{min-width:40px;padding:3px 7px;border:1px solid var(--line);border-top:4px solid var(--c);border-radius:5px;background:var(--paper);color:var(--ink);font-size:.85rem;font-variant-numeric:tabular-nums;cursor:pointer}
 .wchip.lead{border-top-style:dashed}
+.turnout{margin:0 0 24px}
+.turnout .tgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:8px 0 14px}
+.turnout .tgrid div{min-width:0}
+.turnout .k{font-size:.82rem;color:var(--muted);font-weight:700}
+.turnout .v{font-family:var(--display);font-weight:800;font-size:1.35rem;line-height:1.2}
+.turnout .stack{height:18px}
+.turnout .stack i.home{background:repeating-linear-gradient(135deg,var(--track) 0 6px,var(--line) 6px 9px)}
+.tlegend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.88rem;color:var(--muted);margin:6px 0 0}
+.tlegend b{color:var(--ink)}
+.tlegend .hm{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;background:repeating-linear-gradient(135deg,var(--track) 0 3px,var(--muted) 3px 4px)}
+.tline{font-size:.9rem;color:var(--muted)}
+.tline b{color:var(--ink)}
+.ivote{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 0;align-items:center}
+.ivote .q{font-weight:700;margin-right:4px}
+.ivote button{display:inline-flex;align-items:center;gap:10px;padding:8px 14px 8px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit;cursor:pointer}
+.ivote button[aria-checked="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.ivote .box{width:28px;height:28px;border:2px solid var(--ink);border-radius:3px;display:grid;place-items:center;font-family:var(--display);font-weight:800;font-size:1.35rem;line-height:1;color:var(--concern);background:var(--sheet)}
+.vmsg{margin:12px 0 0;padding:12px 16px;border-radius:6px;background:var(--violet-soft);max-width:75ch;text-wrap:pretty}
+.vmsg p{margin:0 0 6px}.vmsg p:last-child{margin:0}
+@media (max-width:560px){.turnout .tgrid{grid-template-columns:1fr 1fr}.turnout .tgrid div:last-child{grid-column:1/-1}}
 .theme-btn{border:1px solid var(--line);background:var(--sheet);color:var(--ink);font-weight:700;border-radius:99px;padding:8px 16px;cursor:pointer}
 
 @media (max-width:760px){
@@ -1540,6 +1560,60 @@ function feedCard(){
   :`<p class="src" style="margin:0">Councils being declared and lead changes in the metros will appear here as new results come in. Keep this page open; it checks every minute.</p>`}</div>`;
 }
 
+/* ---------- Turnout ----------
+   The IEC's "votes cast" counts ballots, and each voter casts two for their council
+   (ward and party list), so voters = ballots / 2. That matches the IEC's 2021 turnout
+   (45.9%) to within half a point. While counting, only counted voting districts are in,
+   so turnout is estimated against the share of districts counted. */
+function turnoutOf(t, vd){
+ if(!t || !t.reg) return null;
+ const voters=Math.round((t.cast||0)/2), frac=vd&&vd[1]?vd[0]/vd[1]:1;
+ const rate=frac>0?Math.min(1,voters/(t.reg*frac)):0;
+ return {reg:t.reg, voters, frac, final:frac>=1, rate, est:Math.round(t.reg*rate)};
+}
+const rate21 = t => t && t[0] ? t[1]/2/t[0] : null;
+/* Combine councils (for districts): add up turnout, progress and party votes */
+function sumCouncils(codes){
+ const t={reg:0,cast:0}, vd=[0,0], votes=new Map();
+ codes.forEach(c=>{ const m=R.data.munis[c]; if(!m) return; t.reg+=m.turnout.reg; t.cast+=m.turnout.cast; vd[0]+=m.prog.vd[0]; vd[1]+=m.prog.vd[1];
+  partyRows(m).forEach(r=>votes.set(r[0],(votes.get(r[0])||0)+r[1])); });
+ const tot=[...votes.values()].reduce((a,b)=>a+b,0);
+ return {t, vd, rows:[...votes].map(([id,v])=>[id,v,tot?v/tot*100:0]).sort((a,b)=>b[1]-a[1])};
+}
+const pctTxt = x => (x*100).toFixed(x<0.1?1:0)+'%';
+function turnoutCard(label, t, vd, rows, base){
+ const T=turnoutOf(t, vd); if(!T) return '';
+ const b=rate21(base), parties=byVotes(rows||[]).slice(0,5), lead=parties[0];
+ if(!T.voters) return `<div class="card turnout"><h3>Who voted in ${esc(label)}</h3><p class="src" style="margin:0">${fmt(T.reg)} registered voters. Turnout appears once the first ballots are counted.</p>${ballotBox(label,T,null)}</div>`;
+ const segs=parties.map(r=>[r[0], r[2]/100*T.rate]), shown=segs.reduce((a,x)=>a+x[1],0), other=Math.max(0,T.rate-shown), home=1-T.rate;
+ const bar=`<span class="stack" role="img" aria-label="${esc(segs.map(([id,x])=>rp(id).abbr+' '+pctTxt(x)).join(', ')+', other parties '+pctTxt(other)+', did not vote '+pctTxt(home))}">${segs.map(([id,x])=>`<i style="width:${(x*100).toFixed(2)}%;background:${rp(id).c}" title="${esc(rp(id).abbr)}: ${pctTxt(x)} of registered voters"></i>`).join('')}<i style="width:${(other*100).toFixed(2)}%;background:var(--muted)" title="Other parties"></i><i class="home" style="width:${(home*100).toFixed(2)}%" title="Did not vote: ${pctTxt(home)}"></i></span>`;
+ return `<div class="card turnout"><h3>Who voted in ${esc(label)}</h3>
+  <div class="tgrid">
+   <div><div class="k">Registered voters</div><div class="v">${fmt(T.reg)}</div></div>
+   <div><div class="k">${T.final?'Voted':'Voted, counted so far'}</div><div class="v">${fmt(T.voters)}</div>${T.final?'':`<div class="src">${(T.frac*100).toFixed(0)}% of voting districts in</div>`}</div>
+   <div><div class="k">Turnout${T.final?'':' (estimate)'}</div><div class="v">${T.final?'':'about '}${pctTxt(T.rate)}</div>${b?`<div class="src">2021: ${pctTxt(b)}</div>`:''}</div>
+  </div>
+  <div class="lbl">Everyone registered, by what they did</div>${bar}
+  <div class="tlegend">${segs.map(([id,x])=>`<span>${chip(id)} <b>${pctTxt(x)}</b></span>`).join('')}${other>0.005?`<span>Others <b>${pctTxt(other)}</b></span>`:''}<span><span class="hm" aria-hidden="true"></span>Didn't vote <b>${pctTxt(home)}</b></span></div>
+  ${lead?`<p class="src" style="margin:10px 0 0">${home>lead[2]/100*T.rate?`More people stayed home than voted for any one party. `:''}${esc(rp(lead[0]).abbr)} leads with ${lead[2].toFixed(1)}% of the vote, which is about ${pctTxt(lead[2]/100*T.rate)} of everyone registered here${T.rate>0?`, or roughly 1 in ${Math.max(1,Math.round(1/(lead[2]/100*T.rate)))}`:''}.</p>`:''}
+  ${ballotBox(label,T,lead)}
+  ${T.final?'':`<p class="src" style="margin:10px 0 0">Turnout is estimated from the voting districts counted so far and will firm up as counting finishes. Voters are ballots cast ÷ 2, since everyone casts a ward and a party ballot for their council.</p>`}</div>`;
+}
+/* "Did you vote?" — a ballot paper style choice, remembered on this device */
+function ballotBox(label, T, lead){
+ const v=store.get('iVoted',null);
+ const opt=(val,txt)=>`<button role="radio" aria-checked="${v===val}" data-ivoted="${val?1:0}"><span class="box" aria-hidden="true">${v===val?'✗':''}</span>${txt}</button>`;
+ let msg='';
+ if(v===true) msg=`<p><b>Thank you for voting.</b> You're one of about ${fmt(T.final?T.voters:T.est)} people in ${esc(label)} who had a say this time.</p>`;
+ else if(v===false){
+  const share=lead?lead[2]/100*T.rate:0;
+  msg=`<p><b>Here's what staying home meant.</b> The ${pctTxt(T.rate)} who voted chose for everyone in ${esc(label)}, including you.${lead&&T.voters?` ${esc(rp(lead[0]).abbr)} is ahead with the votes of about ${pctTxt(share)} of registered voters${share>0?` (1 in ${Math.max(1,Math.round(1/share))})`:''}, so a small group can decide who runs things.`:''}</p>
+   <p>That goes for everyone who didn't vote, and there are many reasons people don't. The next chance is the national and provincial election, due by 2029. You can check your registration on the <a href="https://www.elections.org.za/MyIEC" target="_blank" rel="noopener">IEC voter portal</a>.</p>`;
+ }
+ return `<div class="ivote" role="radiogroup" aria-label="Did you vote on 4 November?"><span class="q">Did you vote?</span>${opt(true,'I voted')}${opt(false,"I didn't vote")}</div>${msg?`<div class="vmsg" aria-live="polite">${msg}</div>`:''}`;
+}
+const turnoutLine = (t, vd) => { const T=turnoutOf(t,vd); return T&&T.voters?`<div class="tline">Turnout ${T.final?'':'about '}<b>${pctTxt(T.rate)}</b>: ${fmt(T.voters)} of ${fmt(T.reg)} registered voters${T.final?'':' counted so far'}</div>`:''; };
+
 /* ---------- "Which councils / wards?" dialog ---------- */
 const WON = {pid:null, kind:'councils', scope:'', prov:'', wk:'won'};
 function scopeCodes(scope){
@@ -1640,6 +1714,7 @@ function viewOverview(){
  const yours=store.get('place',null), ym=yours&&MUNIS[yours.m], yd=ym&&d.munis[ym.code];
  return `${yd?`<div class="notice" style="max-width:none"><b>Your council, ${esc(ym.name)}:</b> ${statusPill(councilStatus(yd))} ${pct(yd.prog.vd[0],yd.prog.vd[1]).toFixed(0)}% counted. <button class="plink" data-rmuni="${ym.code}">See its wards</button></div>`:''}
  ${feedCard()}
+ ${turnoutCard('South Africa', d.turnout, d.prog.vd, d.nat, B21&&B21.t&&B21.t.nat)}
  <h3>Who is ahead nationally</h3>
  ${rows.length?`<div class="cmp-scroll"><table class="nt"><thead><tr><th scope="col">Party</th><th scope="col">Share of the vote</th><th scope="col">Wards won</th><th scope="col">Councils won outright</th></tr></thead><tbody>
  ${top.map(r=>{const p=rp(r[0]), ww=wmap.get(r[0]);return `<tr><td>${chip(r[0])}<span class="pname">${esc(p.name)}</span></td>
@@ -1664,7 +1739,7 @@ function councilTable(codes){
   <td>${statusPill(s)}${s.vpct?`<div class="src">${s.vpct.toFixed(1)}% of the vote</div>`:''}</td>
   <td style="min-width:200px">${seatBar(m)}</td>
   <td style="min-width:160px">${stack(w.list.map(x=>[x[0],x[1]]),w.total,'thin')}<div class="tally">${w.list.slice(0,2).map(([id,n])=>`<span>${chip(id)} <b>${n}</b></span>`).join('')}<span>of ${w.total}</span></div></td>
-  <td class="num">${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}%</td></tr>`}).join('')}
+  <td class="num">${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}%${(()=>{const T=turnoutOf(m.turnout,m.prog.vd);return T&&T.voters?`<div class="src">turnout ${T.final?'':'~'}${pctTxt(T.rate)}</div>`:''})()}</td></tr>`}).join('')}
  </tbody></table></div>`;
 }
 
@@ -1678,11 +1753,12 @@ function viewProvinces(){
    <div><div class="lbl">Most votes</div><div class="big">${l?chip(l[0],` ${l[2].toFixed(1)}%`):'<span class="src">No results yet</span>'}</div></div>
    <div><div class="lbl">Wards won or leading</div>${stack(wardTally(p.munis).list.map(x=>[x[0],x[1]]),wardTally(p.munis).total)}${wardLine(wardTally(p.munis),6,'prov:'+p.code)}</div>
    <div><div class="lbl">Councils</div>${councilLine(councilTally(p.munis),'prov:'+p.code)}</div></div>
+  ${turnoutCard(PROV[p.code], p.turnout, p.prog&&p.prog.vd, p.res, B21&&B21.t&&B21.t.prov[p.code])}
   <h3>Every council in ${esc(PROV[p.code])}</h3>${councilTable(codes)}`;
  }
  return `<div class="rgrid">${d.prov.map(p=>{const l=votesLeader(p.res), w=wardTally(p.munis), c=councilTally(p.munis);
   return `<section class="rcard"><h3>${esc(PROV[p.code])}<small>${p.prog?pct(p.prog.vd[0],p.prog.vd[1]).toFixed(0)+'% counted':'No results yet'}</small></h3>
-  <div><div class="lbl">Most votes</div><div class="big">${l?chip(l[0],` ${l[2].toFixed(1)}%`):'<span class="src">Waiting</span>'}</div></div>
+  <div><div class="lbl">Most votes</div><div class="big">${l?chip(l[0],` ${l[2].toFixed(1)}%`):'<span class="src">Waiting</span>'}</div>${turnoutLine(p.turnout,p.prog&&p.prog.vd)}</div>
   <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3,'prov:'+p.code)}</div>
   <div><div class="lbl">Councils won outright</div>${councilLine(c,'prov:'+p.code)}</div>
   <button class="btn ghost small" data-rprov="${p.code}">See ${p.munis.length} councils</button></section>`}).join('')}</div>`;
@@ -1694,6 +1770,7 @@ function viewMetros(){
  <div class="rgrid">${METRO_ORDER.filter(k=>d.munis[k]).map(k=>{const m=d.munis[k], s=councilStatus(m), w=wardTally([k]);
   return `<section class="rcard" id="metro-${k}"><h3>${esc(muniName(k))}<small>${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted</small></h3>
   <div class="big">${s.lead!=null?chip(s.lead):''} ${statusPill(s)}</div>
+  ${turnoutLine(m.turnout,m.prog.vd)}
   <div><div class="lbl">Seats</div>${seatBar(m)}</div>
   <div><div class="lbl">Party vote</div>${voteList(k,5)}</div>
   <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3,'muni:'+k)}</div>
@@ -1714,6 +1791,7 @@ function viewDistricts(){
   <div class="rcard" style="margin-bottom:20px"><h3>${esc(dd.name)} District<small>${dd.codes.length} local councils</small></h3>
    <div><div class="lbl">Wards won or leading</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,6,'dist:'+dd.prov+'|'+dd.name)}</div>
    <div><div class="lbl">Local councils won outright</div>${councilLine(councilTally(dd.codes),'dist:'+dd.prov+'|'+dd.name)}</div></div>
+  ${(()=>{ const sm=sumCouncils(dd.codes), bt=B21&&dd.codes.reduce((a,c)=>{const x=(B21.munis[c]||{}).t; return x?[a[0]+x[0],a[1]+x[1]]:a},[0,0]); return turnoutCard(dd.name+' District', sm.t, sm.vd, sm.rows, bt); })()}
   ${councilTable(dd.codes)}`;
  }
  const provs=[...new Set(ds.map(x=>x.prov))];
@@ -1721,7 +1799,8 @@ function viewDistricts(){
  return `<p class="intro">Districts group the local councils outside the metros. The IEC dashboard feed doesn't publish district councils' own seat results, so these figures add up the wards and councils of each district's local municipalities.</p>
  <div class="pchips" role="group" aria-label="Filter by province"><button aria-pressed="${!f}" data-rdprov="">All</button>${provs.map(p=>`<button aria-pressed="${f===p}" data-rdprov="${p}">${esc(PROV[p])}</button>`).join('')}</div>
  <div class="rgrid">${ds.filter(x=>!f||x.prov===f).map(dd=>{const w=wardTally(dd.codes);
-  return `<section class="rcard"><h3>${esc(dd.name)}<small>${esc(PROV[dd.prov])}</small></h3>
+  const sm=sumCouncils(dd.codes);
+  return `<section class="rcard"><h3>${esc(dd.name)}<small>${esc(PROV[dd.prov])}</small></h3>${turnoutLine(sm.t,sm.vd)}
   <div><div class="lbl">Wards</div>${stack(w.list.map(x=>[x[0],x[1]]),w.total)}${wardLine(w,3,'dist:'+dd.prov+'|'+dd.name)}</div>
   <div><div class="lbl">Councils won outright</div>${councilLine(councilTally(dd.codes),'dist:'+dd.prov+'|'+dd.name)}</div>
   <button class="btn ghost small" data-rdist="${esc(dd.prov+'|'+dd.name)}">See ${dd.codes.length} councils</button></section>`}).join('')}</div>`;
@@ -1752,6 +1831,7 @@ function viewWards(){
   if(wr){ const p=rp(wr[0]), c=winnerCandidate(R.muni,R.ward,wr[0]);
    detail=`<div class="wdetail" style="--c:${p.c}" aria-live="polite"><h3>Ward ${R.ward}, ${esc(muniName(R.muni))}</h3>
     <p><b>${esc(p.name)}</b> ${wr[2]?'won':'is leading'} with <b>${wr[1].toFixed(1)}%</b> of the ward vote.${wr[2]?'':' Counting is still under way here.'}</p>
+    ${(m.wt||{})[R.ward]?(([n,got,all])=>`<p class="tline"><b>${fmt(n)}</b> valid ward ballots counted${got<all?`, from ${got} of ${all} voting districts`:''}. The IEC doesn't publish registered voters per ward, so ward turnout isn't available.</p>`)(m.wt[R.ward]):''}
     ${c?`<p>Candidate: <b>${esc(tcase(c[2]))} ${esc(tcase(c[1]))}</b>${c[3]?`, ${c[3]}`:''}</p>`:''}
     <p>${R.data.year==='2026'&&WBY[R.muni]?`<button class="plink" data-rcands="${R.ward}">See every candidate in this ward</button>`:''}${p.site?` · <button class="plink" data-goparty="${p.site.id}">About the ${esc(p.abbr)}</button>`:''}</p></div>`;
   } else detail=`<div class="wdetail" style="--c:var(--line)"><h3>Ward ${R.ward}, ${esc(muniName(R.muni))}</h3><p>No result for this ward yet.</p></div>`;
@@ -1762,6 +1842,7 @@ function viewWards(){
   <div><div class="lbl">Party vote</div>${voteList(R.muni,8)}${swingNote()}</div>
   ${coalBuilder(R.muni)}
   ${shareRow(R.muni)}</div>
+  ${turnoutCard(muniName(R.muni), m.turnout, m.prog.vd, partyRows(m), B21&&(B21.munis[R.muni]||{}).t)}
   <h3>Who is winning each ward</h3>
   <div class="key"><span>Solid top edge: won</span><span>Dashed: leading, still counting</span><span>Tap a ward for details. Tap a party to highlight its wards.</span></div>
   <div class="pchips" role="group" aria-label="Highlight a party">${w.list.map(([id,cnt,o])=>`<button aria-pressed="${R.hl===id}" data-rhl="${id}">${chip(id)} <b>${cnt}</b>${o.lead?` <span class="src">(${o.lead} leading)</span>`:''}</button>`).join('')}${w.total>w.declared+w.leading?`<span class="src" style="align-self:center">${w.total-w.declared-w.leading} wards not in yet</span>`:''}</div>
@@ -1781,7 +1862,7 @@ function renderResults(){
  const views={overview:viewOverview,provinces:viewProvinces,metros:viewMetros,districts:viewDistricts,wards:viewWards};
  if(!views[R.view]) R.view='overview';
  const keepFocus = document.activeElement && document.activeElement.closest && document.activeElement.closest('#s-results') ? document.activeElement : null;
- const sel = keepFocus && ['rview','rward','rhl','rdprov','rcoal'].map(k=>keepFocus.dataset[k]!==undefined?`[data-${k}="${keepFocus.dataset[k]}"]`:null).find(Boolean);
+ const sel = keepFocus && ['rview','rward','rhl','rdprov','rcoal','ivoted'].map(k=>keepFocus.dataset[k]!==undefined?`[data-${k}="${keepFocus.dataset[k]}"]`:null).find(Boolean);
  const typing = keepFocus && keepFocus.id==='rq';
  if(typing) return; // don't redraw under someone typing in the council search
  s.innerHTML = head+resHeader()+`<div id="resBody">${views[R.view]()}</div>`+
@@ -1804,6 +1885,7 @@ document.getElementById('s-results').addEventListener('click',e=>{
  if(ds.rshare!==undefined){ navigator.share({text:shareText(ds.rshare)}).catch(()=>{}); return; }
  if(ds.rfeed!==undefined){ R.feedAll=!R.feedAll; return renderResults(); }
  if(ds.rwon!==undefined) return openWon(+ds.rwon, ds.rwk, ds.rscope);
+ if(ds.ivoted!==undefined){ const v=ds.ivoted==='1', cur=store.get('iVoted',null); store.set('iVoted', cur===v?null:v); return renderResults(); }
  if(ds.rward!==undefined){ const k=+ds.rward; return setRes({ward:R.ward===k?null:k}); }
  if(ds.rhl!==undefined){ const k=+ds.rhl; return setRes({hl:R.hl===k?null:k}); }
  if(ds.rcands!==undefined){ candState.view='wards'; candState.code=R.muni; candState.label=muniName(R.muni); candState.ward=+ds.rcands; saveCand(); renderCands(); showTab('cands'); }
