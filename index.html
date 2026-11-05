@@ -213,6 +213,29 @@ td li{margin:4px 0}
 table.wt{min-width:560px}
 table.wt td{vertical-align:middle}
 table.wt tr.won td{background:var(--violet-soft)}
+table.wt td.num{white-space:nowrap;font-variant-numeric:tabular-nums}
+.live26{display:flex;gap:10px;align-items:flex-start;margin:8px 0 10px;padding:10px 14px;border:1px solid var(--line);border-left:6px solid var(--c);border-radius:6px;background:var(--sheet)}
+.live26 .live-dot{margin-top:7px;flex:none}
+.backfab{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:40;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:11px 18px;border:2px solid var(--ink);border-radius:99px;background:var(--ink);color:var(--paper);font:inherit;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.backfab[hidden]{display:none}
+body.hasback{padding-bottom:76px}
+.headline{border-left:8px solid var(--c);background:var(--sheet);border-radius:0 10px 10px 0;padding:16px 20px;margin:0 0 22px;box-shadow:0 1px 0 var(--line)}
+.headline .hl1{font-family:var(--display);font-weight:700;font-size:clamp(1.15rem,2.4vw,1.45rem);line-height:1.35;margin:0 0 6px;text-wrap:balance}
+.headline .hl1 .pchip{font-size:1em}
+.headline .hl2{margin:0;color:var(--muted);text-wrap:pretty}
+.headline .hl2 b{color:var(--ink)}
+.ov-top{display:grid;grid-template-columns:minmax(0,1fr);gap:0 20px;align-items:start}
+@media (min-width:1000px){.ov-top{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}}
+.feed .plink{text-align:left}
+.feed .fdot{width:10px;height:10px;border-radius:50%;background:var(--c,var(--line));flex:none;margin-top:6px}
+.rcard.accent{border-top:6px solid var(--c)}
+.rcard{transition:box-shadow .15s}
+.rcard:hover{box-shadow:0 4px 18px rgba(0,0,0,.08)}
+@media (min-width:700px){
+ .res-seg{position:sticky;top:calc(env(safe-area-inset-top,0px) + 58px);z-index:8;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+ #s-results .wdetail{top:calc(env(safe-area-inset-top,0px) + 124px)}
+}
+.backfab:hover{background:var(--violet);border-color:var(--violet);color:var(--on-violet)}
 .pdot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(128,128,128,.35);margin-right:8px}
 .plink{border:0;background:none;padding:0;color:var(--violet);font-weight:700;text-decoration:underline;cursor:pointer}
 .pname{display:block;font-size:.82rem;color:var(--muted);margin-left:18px;max-width:24ch}
@@ -341,8 +364,8 @@ table.nt td.num,table.ct td.num{font-variant-numeric:tabular-nums;white-space:no
 .wonrow:first-of-type{border-top:0}
 .wonrow .src{font-size:.85rem}
 .wonrow .wchips{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:5px}
-.wchip{min-width:40px;padding:3px 7px;border:1px solid var(--line);border-top:4px solid var(--c);border-radius:5px;background:var(--paper);color:var(--ink);font-size:.85rem;font-variant-numeric:tabular-nums;cursor:pointer}
-.wchip.lead{border-top-style:dashed}
+.wonw{min-width:40px;padding:3px 7px;border:1px solid var(--line);border-top:4px solid var(--c);border-radius:5px;background:var(--paper);color:var(--ink);font-size:.85rem;font-variant-numeric:tabular-nums;cursor:pointer}
+.wonw.lead{border-top-style:dashed}
 .turnout{margin:0 0 24px}
 .turnout .tgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:8px 0 14px}
 .turnout .tgrid div{min-width:0}
@@ -730,7 +753,8 @@ sw.addEventListener('click',toggleMode);
 sw.addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();toggleMode()}});
 
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>showTab(t.dataset.tab)));
-function showTab(name){
+function showTab(name){ navGo(()=>showTab0(name)); }
+function showTab0(name){
  state.tab=name;
  const tl=document.getElementById('tablist');
  document.querySelectorAll('.tab').forEach(t=>{const sel=t.dataset.tab===name; t.setAttribute('aria-selected',sel?'true':'false'); if(sel&&tl){const tr=t.getBoundingClientRect(),lr=tl.getBoundingClientRect(); tl.scrollTo({left:tl.scrollLeft+(tr.left-lr.left)-(lr.width-tr.width)/2,behavior:'smooth'})}});
@@ -1273,20 +1297,58 @@ function candParty(c){
  return {code, name, p};
 }
 function wardsOf(code){ const m=(wardData(),WBY[code]); return m? m[3].map(w=>w[0]).sort((a,b)=>a-b):[]; }
+/* Live 2026 ward votes: wards/<council>.json on the live-data branch, written by the
+   relay. The feed has no candidate names, so candidates are matched by party, and all
+   of a ward's independents arrive as one total. */
+const WV = {};
+function wardVotes(code){
+ const c=WV[code];
+ if(!(c && c.loading) && !(c && Date.now()-c.at<60000)){
+  WV[code]={...(c||{}), loading:true};
+  const urls=[shaVal?RAW_BASE+shaVal+'/wards/'+code+'.json':null, RAW_BASE+'live-data/wards/'+code+'.json?t='+Date.now()].filter(Boolean);
+  (async()=>{ let got=null; for(const u of urls){ try{ const r=await fetch(u); if(r.ok){ got=await r.json(); break; } }catch(e){} }
+   const changed = JSON.stringify(got)!==JSON.stringify((WV[code]||{}).data);
+   WV[code]={data:got, at:Date.now(), loading:false};
+   if(changed && state.tab==='cands' && candState.code===code){ const el=document.getElementById('wardTable'); if(el) el.innerHTML=wardTableHTML(code,candState.ward); } })();
+ }
+ return c && 'data' in c ? c.data : undefined;
+}
+const pkey = code => norm(IEC2CAND[code]||code).replace(/ /g,'');
 function wardTableHTML(code, wardNo){
  wardData(); const m=WBY[code]; if(!m) return `<p class="src">No ward candidates are registered for this council.</p>`;
  const w=m[3].find(x=>x[0]===wardNo);
  if(!w) return `<div class="empty"><p>${esc(m[1])} has no Ward ${wardNo}. It has wards 1 to ${Math.max(...m[3].map(x=>x[0]))}.</p></div>`;
- const rows=w[4].slice().sort((a,b)=>{const x=a[4],y=b[4]; if(x!==y){if(x==null)return 1;if(y==null)return -1;return y-x} return candParty(a).name.localeCompare(candParty(b).name)});
  const winner=w[1];
- const head = winner ? `In 2021 this ward was won by the <b>${esc(winner)}</b> with ${w[2].toFixed(0)}% of the ward vote.` : `No 2021 result for this ward number: it is new or renumbered.`;
- return `<div class="ward-head"><div><h3>Ward ${wardNo}, ${esc(m[1])}</h3><p class="src">${rows.length} candidates. ${head} Ward lines were redrawn for 2026, so the same number may not cover exactly the same streets.</p></div></div>
- <div class="cmp-scroll"><table class="wt"><thead><tr><th scope="col">Party</th><th scope="col">Candidate</th><th scope="col" class="n">Age</th><th scope="col">Party's 2021 vote here</th></tr></thead><tbody>
+ // 2026 live result for this ward, if counting has reached it
+ const live26 = R.data && R.data.year==='2026' && R.data.munis[code];
+ const lv = live26 ? wardVotes(code) : null, lw = lv && lv.w && lv.w[wardNo];
+ const lead = live26 && live26.wards[wardNo], wt = live26 && (live26.wt||{})[wardNo];
+ const nInd = w[4].filter(c=>c[0]<0).length;
+ let vm=null, tot=0, indV=0;
+ if(lw){ vm=new Map(); lw.forEach(([id,v])=>{ tot+=v; if(id===0){ indV=v; return; } const pc=(R.data.parties[String(id)]||[])[0]; if(pc) vm.set(pkey(pc), v); }); }
+ const votesOf = c => !vm ? null : c[0]<0 ? (nInd===1?indV:null) : (vm.get(pkey(wardData().p[c[0]][0]))||0);
+ const leadKey = lead ? pkey(rp(lead[0]).code) : null;
+ const isLead = c => lead && (lead[0]===0 ? c[0]<0 && nInd===1 : c[0]>=0 && pkey(wardData().p[c[0]][0])===leadKey);
+ const rows=w[4].slice().sort((a,b)=>{ if(vm){ const x=votesOf(a)??-1, y=votesOf(b)??-1; if(x!==y) return y-x; }
+  const x=a[4],y=b[4]; if(x!==y){if(x==null)return 1;if(y==null)return -1;return y-x} return candParty(a).name.localeCompare(candParty(b).name)});
+ const head21 = winner ? `In 2021 the <b>${esc(winner)}</b> won this ward with ${w[2].toFixed(0)}% of the ward vote.` : `No 2021 result for this ward number: it is new or renumbered.`;
+ const lp = lead && rp(lead[0]);
+ const head26 = !live26 ? '' : lead
+  ? `<div class="live26" style="--c:${lp.c}"><span class="live-dot ${lead[2]?'final':''}" aria-hidden="true"></span><div><b>2026: ${esc(lp.name)} ${lead[2]?'won':'is leading'}</b> with ${lead[1].toFixed(1)}% of the ward vote.${wt?` <span class="src">${fmt(wt[0])} ballots counted${wt[1]<wt[2]?`, ${wt[1]} of ${wt[2]} voting districts in`:''}.</span>`:''}
+     <button class="plink" data-gores="${esc(code)}" data-goresward="${wardNo}">See it in Live results</button></div></div>`
+  : `<div class="live26" style="--c:var(--line)"><span class="live-dot" aria-hidden="true"></span><div><b>2026:</b> no votes counted in this ward yet. <span class="src">This updates every minute.</span></div></div>`;
+ const col26 = !!vm;
+ return `<div class="ward-head"><div><h3>Ward ${wardNo}, ${esc(m[1])}</h3>${head26}<p class="src">${rows.length} candidates. ${head21} Ward lines were redrawn for 2026, so the same number may not cover exactly the same streets.</p></div></div>
+ <div class="cmp-scroll"><table class="wt"><thead><tr><th scope="col">Party</th><th scope="col">Candidate</th><th scope="col" class="n">Age</th>${col26?`<th scope="col">2026 ward vote <span class="src">(live)</span></th>`:''}<th scope="col">Party's 2021 vote here</th></tr></thead><tbody>
  ${rows.map(c=>{const pp=candParty(c); const isW = winner && pp.code===winner; const col=pp.p?pp.p.c:(pp.code==='IND'?'#6B6F7A':'#9A9AA5');
-   return `<tr class="${isW?'won':''}"><td><span class="pdot" style="--c:${col}"></span>${pp.p?`<button class="plink" data-goparty="${pp.p.id}">${esc(pp.p.abbr)}</button>`:`<span title="${esc(pp.name)}">${esc(pp.code==='IND'?'Independent':pp.code)}</span>`}<span class="pname">${esc(pp.p?pp.p.name:pp.name)}</span></td>
-   <td><b>${esc(tcase(c[2]))} ${esc(tcase(c[1]))}</b></td><td class="n">${c[3]??''}</td>
+   const v=votesOf(c), share=v!=null&&tot?v/tot*100:null, L=isLead(c);
+   return `<tr class="${(col26?L:isW)?'won':''}"><td><span class="pdot" style="--c:${col}"></span>${pp.p?`<button class="plink" data-goparty="${pp.p.id}">${esc(pp.p.abbr)}</button>`:`<span title="${esc(pp.name)}">${esc(pp.code==='IND'?'Independent':pp.code)}</span>`}<span class="pname">${esc(pp.p?pp.p.name:pp.name)}</span></td>
+   <td><b>${esc(tcase(c[2]))} ${esc(tcase(c[1]))}</b>${L?` <span class="status ${lead[2]?'won':'lead'}">${lead[2]?'Won':'Leading'}</span>`:''}${col26&&isW?` <span class="tag">2021 winner</span>`:''}</td><td class="n">${c[3]??''}</td>
+   ${col26?`<td class="num">${share==null?'<span class="src">See note</span>':`<span class="vbar"><i style="width:${Math.min(100,share)}%;background:${col}"></i></span> <b>${share.toFixed(1)}%</b>${c[4]!=null?swing(1,share,[[1,c[4]]]):''} <span class="src">${fmt(v)}</span>`}</td>`:''}
    <td>${c[4]==null?'<span class="src">Did not stand here in 2021</span>':`<span class="vbar"><i style="width:${Math.min(100,c[4])}%;background:${col}"></i></span> ${c[4].toFixed(1)}%`}</td></tr>`}).join('')}
- </tbody></table></div>`;
+ </tbody></table></div>
+ ${col26&&nInd>1?`<p class="src">The IEC reports this ward's ${nInd} independent candidates as one total: ${tot?(indV/tot*100).toFixed(1):0}% (${fmt(indV)} votes).</p>`:''}
+ ${live26&&lv===undefined?`<p class="src">Loading 2026 ward results…</p>`:''}`;
 }
 document.addEventListener('click',e=>{const b=e.target.closest('[data-goparty]'); if(!b)return; const id=b.dataset.goparty; state.open.add(id); showTab('parties'); renderParties(); setTimeout(()=>{const el=document.querySelector(`[data-open="${id}"]`); if(el){el.scrollIntoView({block:'center'}); el.focus()}},50)});
 
@@ -1397,7 +1459,11 @@ async function loadResults(){
  if(pill) pill.hidden = !(R.data && R.data.prog.vd[0]>0 && R.data.prog.vd[0]<R.data.prog.vd[1]);
  if(state.tab==='results') renderResults();
 }
-function setRes(patch){ Object.assign(R,patch); store.set('rView',R.view); store.set('rProv',R.prov); store.set('rDist',R.dist); store.set('rMuni',R.muni); renderResults(); }
+function setRes(patch){
+ const go=()=>{ Object.assign(R,patch); store.set('rView',R.view); store.set('rProv',R.prov); store.set('rDist',R.dist); store.set('rMuni',R.muni); renderResults(); };
+ // moving to another view, province, district or council is a step you can go back from
+ ['view','prov','dist','muni'].some(k=>k in patch && patch[k]!==R[k]) ? navGo(go) : go();
+}
 
 /* party helpers: use this site's names and colours where we know the party */
 function rp(id){
@@ -1543,8 +1609,8 @@ function updateFeed(d){
  if(!old || old.e!==d.event) return;
  const feed=store.get('rFeed',[]), t=d.report||d.fetched, ev=[];
  Object.entries(snap.m).forEach(([c,[k,l]])=>{ const o=old.m[c]; if(!o) return; const m=d.munis[c];
-  if(k!==o[0] && (k==='won'||k==='hung')){ const s=councilStatus(m); ev.push({t,c,big:isMetro(c),m:`${muniName(c)} declared: ${s.text}${s.k==='won'?` with ${s.seats} of ${s.total} seats`:''}`}); }
-  else if(isMetro(c) && l!=null && o[1]!=null && l!==o[1]) ev.push({t,c,big:true,m:`${rp(l).abbr} overtakes ${rp(o[1]).abbr} in ${muniName(c)}`});
+  if(k!==o[0] && (k==='won'||k==='hung')){ const s=councilStatus(m); ev.push({t,c,p:s.lead,big:isMetro(c),m:`${muniName(c)} declared: ${s.text}${s.k==='won'?` with ${s.seats} of ${s.total} seats`:''}`}); }
+  else if(isMetro(c) && l!=null && o[1]!=null && l!==o[1]) ev.push({t,c,p:l,big:true,m:`${rp(l).abbr} overtakes ${rp(o[1]).abbr} in ${muniName(c)}`});
  });
  const dw=snap.w-old.w;
  if(dw>0){ const prev=feed[0]; const e={t,w:1,n:dw+(prev&&prev.w&&Date.parse(t)-Date.parse(prev.t)<15*60000?prev.n:0)};
@@ -1552,11 +1618,17 @@ function updateFeed(d){
   if(prev&&prev.w&&e.n>dw) feed.shift(); ev.push(e); }
  if(ev.length) store.set('rFeed', ev.reverse().concat(feed).slice(0,50));
 }
+function headline(){
+ const d=R.data, rows=byVotes(d.nat), a=rows[0], b=rows[1]; if(!a) return '';
+ const c=councilTally(Object.keys(d.munis)), dec=c.list.reduce((n,x)=>n+x[1],0)+c.hung;
+ return `<div class="headline" style="--c:${rp(a[0]).c}"><p class="hl1">${chip(a[0])} leads the national vote with ${a[2].toFixed(1)}%${b?`, ${a[2]-b[2]<2?'narrowly ':''}ahead of ${chip(b[0])} on ${b[2].toFixed(1)}%`:''}.</p>
+  <p class="hl2">${dec?`<b>${fmt(dec)}</b> of ${fmt(d.prog.munis[1])} councils have a result: ${c.list.map(([id,n])=>wonBtn(id,'councils','',`${esc(rp(id).abbr)} <b>${n}</b>`,`Which councils ${rp(id).abbr} won`)).join(', ')}${c.hung?`, <b>${c.hung}</b> hung`:''}.`:'No council has a final result yet.'} ${pct(d.prog.vd[0],d.prog.vd[1]).toFixed(0)}% of voting districts counted.</p></div>`;
+}
 function feedCard(){
  const f=store.get('rFeed',[]);
  const hm=iso=>new Date(iso).toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
  return `<div class="card" style="margin:0 0 24px"><h3>What's changed</h3>${f.length
-  ?`<ul class="feed" aria-live="polite">${f.slice(0,R.feedAll?50:6).map(x=>`<li class="${x.big?'big':''}"><time datetime="${esc(x.t)}">${hm(x.t)}</time><span>${x.c?`<button class="plink" data-rmuni="${esc(x.c)}">${esc(x.m)}</button>`:esc(x.m)}</span></li>`).join('')}</ul>${f.length>6?`<button class="plink" data-rfeed="1" style="margin-top:8px">${R.feedAll?'Show fewer':`Show all ${f.length}`}</button>`:''}`
+  ?`<ul class="feed" aria-live="polite">${f.slice(0,R.feedAll?50:6).map(x=>`<li class="${x.big?'big':''}"><time datetime="${esc(x.t)}">${hm(x.t)}</time><span class="fdot" style="${x.p!=null?`--c:${rp(x.p).c}`:''}" aria-hidden="true"></span><span>${x.c?`<button class="plink" data-rmuni="${esc(x.c)}">${esc(x.m)}</button>`:esc(x.m)}</span></li>`).join('')}</ul>${f.length>6?`<button class="plink" data-rfeed="1" style="margin-top:8px">${R.feedAll?'Show fewer':`Show all ${f.length}`}</button>`:''}`
   :`<p class="src" style="margin:0">Councils being declared and lead changes in the metros will appear here as new results come in. Keep this page open; it checks every minute.</p>`}</div>`;
 }
 
@@ -1674,7 +1746,7 @@ function renderWon(top){
   + (total ? [...g].map(([pv,cs])=>`<h3>${esc(PROV[pv])} <span class="src">(${fmt(cs.reduce((a,c)=>a+wards.get(c).length,0))} wards)</span></h3>${(()=>{let lastTag='';return cs.map(c=>{const ws=wards.get(c).sort((a,b)=>a[0]-b[0]), tag=muniTag(c);
     const h=tag!==lastTag&&tag!=='Metro'?`<h4>${esc(tag)}</h4>`:''; lastTag=tag;
     return h+`<div class="wonrow"><div><button class="plink" data-wmuni="${c}">${esc(muniName(c))}</button>${tag==='Metro'?' <span class="src">Metro</span>':''}</div><div class="src">${ws.length} of ${d.munis[c].prog.wards[1]} wards</div>
-     <div class="wchips">${ws.map(([k,w])=>`<button class="wchip ${w[2]?'':'lead'}" style="--c:${p.c}" data-wmuni="${c}" data-wward="${k}" title="Ward ${k}: ${w[1].toFixed(1)}%${w[2]?'':', still counting'}" aria-label="Ward ${k}, ${w[2]?'won':'leading'} with ${w[1].toFixed(0)}%">${k}</button>`).join('')}</div></div>`}).join('')})()}`).join('')
+     <div class="wchips">${ws.map(([k,w])=>`<button class="wonw ${w[2]?'':'lead'}" style="--c:${p.c}" data-wmuni="${c}" data-wward="${k}" title="Ward ${k}: ${w[1].toFixed(1)}%${w[2]?'':', still counting'}" aria-label="Ward ${k}, ${w[2]?'won':'leading'} with ${w[1].toFixed(0)}%">${k}</button>`).join('')}</div></div>`}).join('')})()}`).join('')
    : `<p class="empty">No ${WON.wk==='lead'?'wards where '+esc(p.abbr)+' is leading':'wards '+esc(p.abbr)+(WON.wk==='won'?' has won':' has won or leads')} in ${esc(where)} yet.</p>`)
   + `<p class="src" style="margin-top:16px">Solid top edge: won. Dashed: leading, still counting. Tap a ward to open it.</p>`;
  }
@@ -1713,8 +1785,8 @@ function viewOverview(){
  const top=rows.slice(0,12);
  const yours=store.get('place',null), ym=yours&&MUNIS[yours.m], yd=ym&&d.munis[ym.code];
  return `${yd?`<div class="notice" style="max-width:none"><b>Your council, ${esc(ym.name)}:</b> ${statusPill(councilStatus(yd))} ${pct(yd.prog.vd[0],yd.prog.vd[1]).toFixed(0)}% counted. <button class="plink" data-rmuni="${ym.code}">See its wards</button></div>`:''}
- ${feedCard()}
- ${turnoutCard('South Africa', d.turnout, d.prog.vd, d.nat, B21&&B21.t&&B21.t.nat)}
+ ${headline()}
+ <div class="ov-top">${feedCard()}${turnoutCard('South Africa', d.turnout, d.prog.vd, d.nat, B21&&B21.t&&B21.t.nat)}</div>
  <h3>Who is ahead nationally</h3>
  ${rows.length?`<div class="cmp-scroll"><table class="nt"><thead><tr><th scope="col">Party</th><th scope="col">Share of the vote</th><th scope="col">Wards won</th><th scope="col">Councils won outright</th></tr></thead><tbody>
  ${top.map(r=>{const p=rp(r[0]), ww=wmap.get(r[0]);return `<tr><td>${chip(r[0])}<span class="pname">${esc(p.name)}</span></td>
@@ -1768,7 +1840,7 @@ function viewMetros(){
  const d=R.data;
  return `<p class="intro">A metro council needs more than half its seats to govern alone. Otherwise parties must form a coalition, and the council elects the mayor.</p>
  <div class="rgrid">${METRO_ORDER.filter(k=>d.munis[k]).map(k=>{const m=d.munis[k], s=councilStatus(m), w=wardTally([k]);
-  return `<section class="rcard" id="metro-${k}"><h3>${esc(muniName(k))}<small>${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted</small></h3>
+  return `<section class="rcard ${s.lead!=null?'accent':''}" id="metro-${k}" style="--c:${s.lead!=null?rp(s.lead).c:'var(--line)'}"><h3>${esc(muniName(k))}<small>${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted</small></h3>
   <div class="big">${s.lead!=null?chip(s.lead):''} ${statusPill(s)}</div>
   ${turnoutLine(m.turnout,m.prog.vd)}
   <div><div class="lbl">Seats</div>${seatBar(m)}</div>
@@ -1891,6 +1963,59 @@ document.getElementById('s-results').addEventListener('click',e=>{
  if(ds.rcands!==undefined){ candState.view='wards'; candState.code=R.muni; candState.label=muniName(R.muni); candState.ward=+ds.rcands; saveCand(); renderCands(); showTab('cands'); }
 });
 
+/* ============ BACK NAVIGATION ============
+   Moving to another tab, or to another view, province, district or council in Live
+   results, adds a browser history entry. The phone's back button then works, and a
+   floating Back button names where it goes and restores the scroll position. */
+const NAV = {ready:false, busy:false, restoring:false};
+const tabLabel = t => { const el=document.querySelector(`.tab[data-tab="${t}"]`); return el ? el.firstChild.textContent.trim() : t; };
+function navSnap(){ return {tab:state.tab, r:{view:R.view, prov:R.prov, dist:R.dist, muni:R.muni, ward:R.ward}, c:{view:candState.view, code:candState.code, ward:candState.ward, label:candState.label}}; }
+function navLabel(sn){
+ if(sn.tab==='results'){ const r=sn.r;
+  if(r.view==='wards' && r.muni && R.data) return (r.ward!=null?`ward ${r.ward}, `:'')+muniName(r.muni);
+  if(r.view==='provinces' && r.prov) return PROV[r.prov];
+  if(r.view==='districts' && r.dist) return r.dist.split('|')[1]+' District';
+  return {overview:'Live results',provinces:'all provinces',metros:'the metros',districts:'all districts',wards:'Live results'}[r.view]||'Live results'; }
+ if(sn.tab==='cands' && sn.c.view==='wards' && sn.c.code && sn.c.ward!=null) return `ward ${sn.c.ward} candidates`;
+ return tabLabel(sn.tab);
+}
+function navGo(change){
+ if(!NAV.ready || NAV.busy || NAV.restoring) return change();
+ NAV.busy=true;
+ const before=navSnap(), depth=(history.state&&history.state.depth)||0;
+ try{ history.replaceState({...(history.state||{}), ...before, y:scrollY, depth}, ''); }catch(e){}
+ try{ change(); } finally { NAV.busy=false; }
+ const after=navSnap(); if(JSON.stringify(before)===JSON.stringify(after)) return;
+ try{ history.pushState({...after, y:0, depth:depth+1, back:navLabel(before)}, ''); }catch(e){}
+ paintBack();
+}
+function paintBack(){
+ let b=document.getElementById('backBtn');
+ if(!b){ b=document.createElement('button'); b.id='backBtn'; b.className='backfab'; b.onclick=()=>history.back(); document.body.appendChild(b); }
+ const st=history.state; b.hidden=!(st && st.depth>0 && st.back);
+ document.body.classList.toggle('hasback', !b.hidden);
+ if(!b.hidden){ b.innerHTML=`<span aria-hidden="true">←</span> Back to ${esc(st.back)}`; b.setAttribute('aria-label','Back to '+st.back); }
+}
+addEventListener('popstate', e=>{
+ const st=e.state; if(!st || !st.tab) return;
+ NAV.restoring=true;
+ try{
+  Object.assign(R, st.r||{}); store.set('rView',R.view); store.set('rProv',R.prov); store.set('rDist',R.dist); store.set('rMuni',R.muni);
+  if(st.c){ Object.assign(candState, st.c); saveCand(); }
+  const wd=document.getElementById('wonDlg'); if(wd && wd.open) wd.close();
+  showTab0(st.tab);
+  if(st.tab==='results') renderResults(); else if(st.tab==='cands') renderCands();
+ } finally { NAV.restoring=false; }
+ paintBack();
+ requestAnimationFrame(()=>scrollTo({top:st.y||0, behavior:'instant'}));
+});
+document.addEventListener('click', e=>{
+ const b=e.target.closest('[data-gores]'); if(!b) return;
+ const ward=b.dataset.goresward?+b.dataset.goresward:null;
+ navGo(()=>{ Object.assign(R,{view:'wards', muni:b.dataset.gores, ward, hl:null}); store.set('rView','wards'); store.set('rMuni',R.muni); showTab0('results'); renderResults(); });
+ setTimeout(()=>{ const el=document.querySelector('.wdetail')||document.getElementById('h-results'); el&&el.scrollIntoView({block:'start',behavior:'smooth'}); },60);
+});
+
 /* ============ THEME ============ */
 document.getElementById('themeBtn').onclick=()=>{
  const r=document.documentElement; const dark = r.dataset.theme ? r.dataset.theme==='dark' : matchMedia('(prefers-color-scheme: dark)').matches;
@@ -1902,6 +2027,8 @@ function renderAll(){renderResults();renderParties();renderCompare();renderPrese
 applyMode();
 if(Date.now()>=POLLS_CLOSE) showTab('results');
 (()=>{ const c=new URLSearchParams(location.search).get('council'); if(c && /^[A-Z]{2,3}\d{0,3}$/i.test(c)){ Object.assign(R,{view:'wards', muni:c.toUpperCase(), ward:null, hl:null}); showTab('results'); } })();
+try{ const h=history.state; history.replaceState({...(h||{}), ...navSnap(), y:scrollY, depth:(h&&h.depth)||0}, ''); }catch(e){}
+NAV.ready=true; paintBack();
 loadResults();
 setInterval(()=>{ if(document.visibilityState==='visible') loadResults(); }, 60000);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && Date.now()-R.loadedAt>60000) loadResults(); });

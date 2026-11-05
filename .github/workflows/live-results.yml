@@ -39,12 +39,20 @@ jobs:
           git config user.name "results-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           OUT="$RUNNER_TEMP/live.json"
-          # Start from the last published copy so a failed province keeps its data.
-          if git fetch -q origin live-data 2>/dev/null; then git show FETCH_HEAD:live.json > "$OUT"; first=false; else cp results/live.json "$OUT"; first=true; fi
+          WARDS="$RUNNER_TEMP/wards"
+          mkdir -p "$WARDS"
+          # Start from the last published copy so a failed province keeps its data,
+          # and councils not refetched this run keep their ward files.
+          if git fetch -q origin live-data 2>/dev/null; then
+            git show FETCH_HEAD:live.json > "$OUT"; first=false
+            git archive FETCH_HEAD wards 2>/dev/null | tar -x -C "$RUNNER_TEMP" || true
+          else cp results/live.json "$OUT"; first=true; fi
 
           publish() {
-            blob=$(git hash-object -w "$OUT")
-            tree=$(printf '100644 blob %s\tlive.json\n' "$blob" | git mktree)
+            # live.json plus wards/<council>.json, as one commit with no parent
+            tree=$( { printf '100644 blob %s\tlive.json\n' "$(git hash-object -w "$OUT")"
+                      [ -n "$(ls -A "$WARDS")" ] && printf '040000 tree %s\twards\n' "$(for f in "$WARDS"/*.json; do printf '100644 blob %s\t%s\n' "$(git hash-object -w "$f")" "$(basename "$f")"; done | git mktree)"
+                    } | git mktree)
             commit=$(git commit-tree "$tree" -m "Live results $(date -u +%FT%TZ)")
             git push -q -f origin "$commit:refs/heads/live-data"
             echo "published $(date -u +%T)"
@@ -69,7 +77,7 @@ jobs:
           final=false
           while :; do
             started=$SECONDS
-            if python3 scripts/fetch_results.py --out "$OUT" | tee /dev/stderr | grep -q '^wrote' || [ "$first" = true ]; then publish; first=false; fi
+            if python3 scripts/fetch_results.py --out "$OUT" --wards-dir "$WARDS" | tee /dev/stderr | grep -q '^wrote' || [ "$first" = true ]; then publish; first=false; fi
             to_master || echo "warn: master update failed"
             if is_final; then final=true; echo "Counting complete"; break; fi
             [ $SECONDS -ge $end ] && break

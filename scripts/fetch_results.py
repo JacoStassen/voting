@@ -91,7 +91,7 @@ FULL_EVERY = 300   # refetch a non-metro council's full party list at most every
 FULL_MAX = 40      # and at most this many full files per run (each is ~100-300 KB gzipped)
 
 
-def fetch_full(base, data, prev, used):
+def fetch_full(base, data, prev, used, wards_dir=None):
     """The province feed lists only each council's top three parties. The per-council
     file (EEID...Munic{id}.js) has every party but is large, so fetch it only for
     councils whose count moved, metros first, and reuse the last copy otherwise."""
@@ -108,7 +108,8 @@ def fetch_full(base, data, prev, used):
         if not m.get("mid") or not m["prog"]["vd"][0]:
             continue
         moved = old.get("prog", {}).get("vd") != m["prog"]["vd"] or old.get("prog", {}).get("seats") != m["prog"]["seats"]
-        if not m.get("all") or (moved and (code in METRO_PREFIX or now - m.get("ft", 0) >= FULL_EVERY)):
+        no_wards = wards_dir and not os.path.exists(os.path.join(wards_dir, f"{code}.json"))
+        if not m.get("all") or no_wards or (moved and (code in METRO_PREFIX or now - m.get("ft", 0) >= FULL_EVERY)):
             todo.append(code)
     todo.sort(key=lambda c: (c not in METRO_PREFIX, data["munis"][c].get("ft", 0)))
     todo = todo[:FULL_MAX]
@@ -134,6 +135,21 @@ def fetch_full(base, data, prev, used):
                 if ballots:
                     wt[str(int(str(w.get("WardID"))[-3:]))] = [ballots, got, len(vds)]
             data["munis"][code]["wt"] = wt
+            # Per-ward party votes go to a small file per council (wards/JHB.json) that the
+            # Candidates tab loads on demand. The feed has no candidate names and lumps a
+            # ward's independents together under party 0.
+            if wards_dir:
+                wv = {}
+                for w in full.get("WardResults") or []:
+                    rows = sorted(([b["ID"], b.get("WardVotes", 0)] for b in w.get("PartyBallotResults") or [] if b.get("WardVotes")),
+                                  key=lambda r: -r[1])
+                    if rows:
+                        used.update(r[0] for r in rows)
+                        wv[str(int(str(w.get("WardID"))[-3:]))] = rows
+                os.makedirs(wards_dir, exist_ok=True)
+                with open(os.path.join(wards_dir, f"{code}.json"), "w") as f:
+                    json.dump({"event": data["event"], "fetched": data["fetched"], "report": full.get("ReportDate"), "w": wv},
+                              f, separators=(",", ":"))
     if todo:
         print(f"full party lists: fetched {len(todo)} councils", file=sys.stderr)
 
@@ -143,6 +159,7 @@ def main():
     ap.add_argument("--event", type=int, default=1887)
     ap.add_argument("--year", default="2026")
     ap.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "..", "results", "live.json"))
+    ap.add_argument("--wards-dir", help="where to write per-council ward votes (default: wards/ next to --out)")
     a = ap.parse_args()
 
     base = f"{BASE}/{a.year}/EEID{a.event}"
@@ -219,7 +236,7 @@ def main():
                              "turnout": turnout(p.get("PartyBallotResults")),
                              "res": results(p.get("PartyBallotResults"), used), "munis": codes})
 
-    fetch_full(base, data, prev, used)
+    fetch_full(base, data, prev, used, a.wards_dir or os.path.join(os.path.dirname(out), "wards"))
 
     data["parties"] = {str(i): [pmeta[i]["Name"], pmeta[i]["PartyFullName"].title(), pmeta[i]["sWebColour"]]
                        for i in sorted(used) if i in pmeta}
