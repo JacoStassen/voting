@@ -246,6 +246,10 @@ table.wt td.num{white-space:nowrap;font-variant-numeric:tabular-nums}
 .trkbtn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--sheet);color:var(--ink);border-radius:99px;padding:4px 12px;font:inherit;font-size:.85rem;font-weight:700;cursor:pointer;white-space:nowrap;vertical-align:middle}
 .trkbtn[aria-pressed="true"]{border-color:var(--violet);background:var(--violet-soft)}
 .trktip{font-size:.88rem;color:var(--muted);margin:0 0 18px}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:45;width:min(520px,calc(100% - 32px));background:var(--sheet);color:var(--ink);border:2px solid var(--ink);border-radius:10px;padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.toast[hidden]{display:none}
+.toast p{margin:0 0 10px;font-size:.95rem;text-wrap:pretty}
+.toast-a{display:flex;flex-wrap:wrap;gap:8px}
 @media (max-width:560px){.trkgrid{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:82%;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px;-webkit-overflow-scrolling:touch}.trk{scroll-snap-align:start}}
 .pipbody{margin:0;padding:10px;background:var(--paper);color:var(--ink);font-family:var(--body)}
 .pip .trk{margin:0 0 8px}
@@ -2001,12 +2005,12 @@ function renderResults(){
  const views={overview:viewOverview,provinces:viewProvinces,metros:viewMetros,districts:viewDistricts,wards:viewWards};
  if(!views[R.view]) R.view='overview';
  const keepFocus = document.activeElement && document.activeElement.closest && document.activeElement.closest('#s-results') ? document.activeElement : null;
- const sel = keepFocus && ['rview','rward','rhl','rdprov','rcoal','ivoted','trk','trkrm'].map(k=>keepFocus.dataset[k]!==undefined?`[data-${k}="${keepFocus.dataset[k]}"]`:null).find(Boolean);
+ const sel = keepFocus && ['rview','rward','rhl','rdprov','rcoal','ivoted','trk','trkrm'].map(k=>keepFocus.dataset[k]!==undefined?`[data-${k}="${CSS.escape(keepFocus.dataset[k])}"]`:null).find(Boolean);
  const typing = keepFocus && keepFocus.id==='rq';
  if(typing) return; // don't redraw under someone typing in the council search
  s.innerHTML = head+resHeader()+`<div id="resBody">${views[R.view]()}</div>`+
   `<p class="src" style="margin-top:22px">Source: Electoral Commission of South Africa results feed, copied here about once a minute. Figures can change until the IEC declares each council. Ward candidate names come from the IEC's certified list; check the <a href="${IEC_DASH}" target="_blank" rel="noopener">IEC dashboard</a> for official results.</p>`;
- if(sel){ const el=s.querySelector(sel); el&&el.focus({preventScroll:true}); }
+ if(sel){ try{ const el=s.querySelector(sel); el&&el.focus({preventScroll:true}); }catch(e){} }
  segbarCheck();
  if(R.view==='wards' && document.getElementById('rq')) wireCombo('rq','sugg3',(label,m)=>{ if(!R.data.munis[m.code]) return; document.getElementById('rq').blur(); setRes({muni:m.code, ward:null, hl:null}); });
 }
@@ -2086,13 +2090,47 @@ function trackPanel(){
  return `<section class="trkpanel" aria-label="Areas you're tracking"><div class="trkpanel-h"><h3>Tracking</h3>
   ${canPip()?`<button class="btn ghost small" data-trkpip="1">${TRK.pip?'Pop-out is open':'Pop out'}</button>`:''}
   ${canAlert()?`<button class="btn ghost small" data-trkalert="1" aria-pressed="${al}">${al?'🔔 Alerts on':'🔕 Turn on alerts'}</button>`:''}</div>
+  ${!canAlert()&&isIOS()&&!isInstalled()?`<p class="src" style="margin:0 0 10px">For alerts on an iPhone or iPad, add this site to your Home Screen (Share, then Add to Home Screen) and open it from there.</p>`:''}
   <div class="trkgrid">${TRK.list.map(x=>trackTile(x)).join('')}</div>
   ${al?`<p class="src" style="margin:8px 0 0">You'll get an alert when a tracked area is declared, a ward is won, or the lead changes, while this site is open. Phones pause websites in the background, so keep it open (or add it to your home screen) to keep updates coming.</p>`:''}</section>`;
 }
+const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+const isInstalled = () => navigator.standalone===true || matchMedia('(display-mode: standalone)').matches;
 function toggleTrack(x){
- if(isTracked(x)) TRK.list=TRK.list.filter(y=>trkId(y)!==trkId(x));
+ const adding=!isTracked(x);
+ if(!adding) TRK.list=TRK.list.filter(y=>trkId(y)!==trkId(x));
  else { if(TRK.list.length>=TRK.max) TRK.list.shift(); TRK.list.push(x); }
  store.set('track',TRK.list); trackSigs(false); renderResults(); paintPip(); paintBadge();
+ if(!adding) return;
+ // Ask for alerts right away, while we still have the tap (browsers need one), unless
+ // the person has switched alerts off themselves.
+ if(canAlert() && !store.get('trkAlertOff',false)){
+  if(Notification.permission==='default'){
+   Notification.requestPermission().then(p=>{ store.set('trkAlert', p==='granted'); renderResults(); trackToast(x); }).catch(()=>trackToast(x));
+   return;
+  }
+  if(Notification.permission==='granted') store.set('trkAlert', true);
+ }
+ renderResults(); trackToast(x);
+}
+/* A short confirmation after tracking something: what you'll get, and what to do for more */
+function trackToast(x){
+ const i=trackInfo(x); if(!i) return;
+ let note;
+ if(alertsOn()) note=`You'll get an alert when it's declared or the lead changes, while this site is open.`;
+ else if(canAlert() && Notification.permission==='denied') note=`Alerts are blocked for this site. You can allow them in your browser's site settings.`;
+ else if(canAlert()) note=`Alerts are off. Turn them on in the Tracking panel any time.`;
+ else if(isIOS() && !isInstalled()) note=`To get alerts on an iPhone or iPad, add this site to your Home Screen (Share, then Add to Home Screen) and open it from there.`;
+ else note=`This browser can't show alerts, but the tile updates every minute.`;
+ let t=document.getElementById('trkToast');
+ if(!t){ t=document.createElement('div'); t.id='trkToast'; t.className='toast'; t.setAttribute('role','status'); document.body.appendChild(t);
+  t.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
+   if(b.dataset.tpip!==undefined) popOut().catch(err=>console.warn('Pop-out window failed:',err));
+   if(b.dataset.tview!==undefined){ const p=document.querySelector('.trkpanel'); p&&p.scrollIntoView({behavior:'smooth',block:'center'}); }
+   t.hidden=true; }); }
+ t.innerHTML=`<p><b><span aria-hidden="true">★</span> Tracking ${esc(x.t==='ward'?i.title+', '+i.sub:i.title)}.</b> ${note}</p>
+  <div class="toast-a"><button class="btn small" data-tview>See it</button>${canPip()&&!TRK.pip?`<button class="btn ghost small" data-tpip>Pop out window</button>`:''}<button class="btn ghost small" data-tclose aria-label="Dismiss">OK</button></div>`;
+ t.hidden=false; clearTimeout(t._h); t._h=setTimeout(()=>{ t.hidden=true; }, 12000);
 }
 function goTrack(x){
  const i=trackInfo(x); if(!i) return;
@@ -2120,7 +2158,8 @@ async function sendAlert(title, body, url, tag){
  try{ const n=new Notification(title, opts); n.onclick=()=>{ window.focus(); n.close(); }; }catch(e){}
 }
 async function toggleAlerts(){
- if(alertsOn()){ store.set('trkAlert',false); return renderResults(); }
+ if(alertsOn()){ store.set('trkAlert',false); store.set('trkAlertOff',true); return renderResults(); }
+ store.set('trkAlertOff',false);
  const p = Notification.permission==='granted' ? 'granted' : await Notification.requestPermission();
  store.set('trkAlert', p==='granted');
  if(p==='denied') alert("Alerts are blocked for this site. You can allow them in your browser's site settings.");
