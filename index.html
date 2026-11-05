@@ -1679,13 +1679,17 @@ function feedCard(){
    The IEC's "votes cast" counts ballots, and each voter casts two for their council
    (ward and party list), so voters = ballots / 2. That matches the IEC's 2021 turnout
    (45.9%) to within half a point. While counting, only counted voting districts are in,
-   so turnout is estimated against the share of districts counted. */
+   so turnout is estimated against the share of districts counted. Districts that report
+   early tend to be small, which drags that estimate down, so below half counted we
+   show no percentage at all (`early`). */
+const TURNOUT_FROM = 0.5;
 function turnoutOf(t, vd){
  if(!t || !t.reg) return null;
- const voters=Math.round((t.cast||0)/2), frac=vd&&vd[1]?vd[0]/vd[1]:1;
+ const voters=Math.round((t.cast||0)/2), frac=vd&&vd[1]?vd[0]/vd[1]:1, final=frac>=1;
  const rate=frac>0?Math.min(1,voters/(t.reg*frac)):0;
- return {reg:t.reg, voters, frac, final:frac>=1, rate, est:Math.round(t.reg*rate)};
+ return {reg:t.reg, voters, frac, final, early:!final && frac<TURNOUT_FROM, rate, est:Math.round(t.reg*rate)};
 }
+const turnoutWhy = `Districts that report first tend to be smaller, so a turnout worked out now could be well off; we show it once at least half of the voting districts are counted. The IEC's own turnout report covers only districts it has audited, which early on can be just one or two, so its figure can also look very different from the final turnout.`;
 const rate21 = t => t && t[0] ? t[1]/2/t[0] : null;
 /* Combine councils (for districts): add up turnout, progress and party votes */
 function sumCouncils(codes){
@@ -1699,27 +1703,41 @@ const pctTxt = x => (x*100).toFixed(x<0.1?1:0)+'%';
 function turnoutCard(label, t, vd, rows, base){
  const T=turnoutOf(t, vd); if(!T) return '';
  const b=rate21(base), parties=byVotes(rows||[]).slice(0,5), lead=parties[0];
- if(!T.voters) return `<div class="card turnout"><h3>Who voted in ${esc(label)}</h3><p class="src" style="margin:0">${fmt(T.reg)} registered voters. Turnout appears once the first ballots are counted.</p>${ballotBox(label,T,null)}</div>`;
+ if(!T.voters) return `<div class="card turnout"><h3>Who voted in ${esc(label)}</h3><p class="src" style="margin:0">${fmt(T.reg)} registered voters. Turnout appears once the first ballots are counted.</p>${ballotBox(label,T,null,b)}</div>`;
+ if(T.early) return `<div class="card turnout"><h3>Who voted in ${esc(label)}</h3>
+  <div class="tgrid">
+   <div><div class="k">Registered voters</div><div class="v">${fmt(T.reg)}</div></div>
+   <div><div class="k">Votes counted so far</div><div class="v">${fmt(T.voters)}</div><div class="src">${(T.frac*100).toFixed(0)}% of voting districts in</div></div>
+   <div><div class="k">Turnout</div><div class="v">Too early</div>${b?`<div class="src">2021: ${pctTxt(b)}</div>`:''}</div>
+  </div>
+  <p class="src" style="margin:0">${turnoutWhy}</p>
+  ${ballotBox(label,T,lead,b)}</div>`;
  const segs=parties.map(r=>[r[0], r[2]/100*T.rate]), shown=segs.reduce((a,x)=>a+x[1],0), other=Math.max(0,T.rate-shown), home=1-T.rate;
  const bar=`<span class="stack" role="img" aria-label="${esc(segs.map(([id,x])=>rp(id).abbr+' '+pctTxt(x)).join(', ')+', other parties '+pctTxt(other)+', did not vote '+pctTxt(home))}">${segs.map(([id,x])=>`<i style="width:${(x*100).toFixed(2)}%;background:${rp(id).c}" title="${esc(rp(id).abbr)}: ${pctTxt(x)} of registered voters"></i>`).join('')}<i style="width:${(other*100).toFixed(2)}%;background:var(--muted)" title="Other parties"></i><i class="home" style="width:${(home*100).toFixed(2)}%" title="Did not vote: ${pctTxt(home)}"></i></span>`;
  return `<div class="card turnout"><h3>Who voted in ${esc(label)}</h3>
   <div class="tgrid">
    <div><div class="k">Registered voters</div><div class="v">${fmt(T.reg)}</div></div>
-   <div><div class="k">${T.final?'Voted':'Voted, counted so far'}</div><div class="v">${fmt(T.voters)}</div>${T.final?'':`<div class="src">${(T.frac*100).toFixed(0)}% of voting districts in</div>`}</div>
+   <div><div class="k">${T.final?'Voted':'Votes counted so far'}</div><div class="v">${fmt(T.voters)}</div>${T.final?'':`<div class="src">${(T.frac*100).toFixed(0)}% of voting districts in</div>`}</div>
    <div><div class="k">Turnout${T.final?'':' (estimate)'}</div><div class="v">${T.final?'':'about '}${pctTxt(T.rate)}</div>${b?`<div class="src">2021: ${pctTxt(b)}</div>`:''}</div>
   </div>
   <div class="lbl">Everyone registered, by what they did</div>${bar}
   <div class="tlegend">${segs.map(([id,x])=>`<span>${chip(id)} <b>${pctTxt(x)}</b></span>`).join('')}${other>0.005?`<span>Others <b>${pctTxt(other)}</b></span>`:''}<span><span class="hm" aria-hidden="true"></span>Didn't vote <b>${pctTxt(home)}</b></span></div>
   ${lead?`<p class="src" style="margin:10px 0 0">${home>lead[2]/100*T.rate?`More people stayed home than voted for any one party. `:''}${esc(rp(lead[0]).abbr)} leads with ${lead[2].toFixed(1)}% of the vote, which is about ${pctTxt(lead[2]/100*T.rate)} of everyone registered here${T.rate>0?`, or roughly 1 in ${Math.max(1,Math.round(1/(lead[2]/100*T.rate)))}`:''}.</p>`:''}
-  ${ballotBox(label,T,lead)}
-  ${T.final?'':`<p class="src" style="margin:10px 0 0">Turnout is estimated from the voting districts counted so far and will firm up as counting finishes. Voters are ballots cast ÷ 2, since everyone casts a ward and a party ballot for their council.</p>`}</div>`;
+  ${ballotBox(label,T,lead,b)}
+  ${T.final?`<p class="src" style="margin:10px 0 0">Voters are ballots cast ÷ 2, since everyone casts a ward and a party ballot for their council. The IEC's official turnout report may differ slightly.</p>`:`<p class="src" style="margin:10px 0 0">An estimate from the ${(T.frac*100).toFixed(0)}% of voting districts counted so far, which firms up as counting finishes. Voters are ballots cast ÷ 2, since everyone casts a ward and a party ballot for their council.</p>`}</div>`;
 }
 /* "Did you vote?" — a ballot paper style choice, remembered on this device */
-function ballotBox(label, T, lead){
+function ballotBox(label, T, lead, b21){
  const v=store.get('iVoted',null);
  const opt=(val,txt)=>`<button role="radio" aria-checked="${v===val}" data-ivoted="${val?1:0}"><span class="box" aria-hidden="true">${v===val?'✗':''}</span>${txt}</button>`;
  let msg='';
- if(v===true) msg=`<p><b>Thank you for voting.</b> You're one of about ${fmt(T.final?T.voters:T.est)} people in ${esc(label)} who had a say this time.</p>`;
+ if(v===true) msg = T.early||!T.voters
+  ? `<p><b>Thank you for voting.</b> ${T.voters?`${fmt(T.voters)} votes in ${esc(label)} have been counted so far, and yours is among them or on its way.`:`Your vote is part of the count under way in ${esc(label)}.`}</p>`
+  : `<p><b>Thank you for voting.</b> You're one of about ${fmt(T.final?T.voters:T.est)} people in ${esc(label)} who had a say this time.</p>`;
+ else if(v===false && (T.early||!T.voters)){
+  msg=`<p><b>Here's what staying home means.</b> The people who voted choose for everyone in ${esc(label)}, including you.${b21?` In 2021 only ${pctTxt(b21)} of registered voters here voted, so a minority decided who ran things.`:''} We'll show this year's turnout once more of the count is in.</p>
+   <p>That goes for everyone who didn't vote, and there are many reasons people don't. The next chance is the national and provincial election, due by 2029. You can check your registration on the <a href="https://www.elections.org.za/MyIEC" target="_blank" rel="noopener">IEC voter portal</a>.</p>`;
+ }
  else if(v===false){
   const share=lead?lead[2]/100*T.rate:0;
   msg=`<p><b>Here's what staying home meant.</b> The ${pctTxt(T.rate)} who voted chose for everyone in ${esc(label)}, including you.${lead&&T.voters?` ${esc(rp(lead[0]).abbr)} is ahead with the votes of about ${pctTxt(share)} of registered voters${share>0?` (1 in ${Math.max(1,Math.round(1/share))})`:''}, so a small group can decide who runs things.`:''}</p>
@@ -1727,7 +1745,10 @@ function ballotBox(label, T, lead){
  }
  return `<div class="ivote" role="radiogroup" aria-label="Did you vote on 4 November?"><span class="q">Did you vote?</span>${opt(true,'I voted')}${opt(false,"I didn't vote")}</div>${msg?`<div class="vmsg" aria-live="polite">${msg}</div>`:''}`;
 }
-const turnoutLine = (t, vd) => { const T=turnoutOf(t,vd); return T&&T.voters?`<div class="tline">Turnout ${T.final?'':'about '}<b>${pctTxt(T.rate)}</b>: ${fmt(T.voters)} of ${fmt(T.reg)} registered voters${T.final?'':' counted so far'}</div>`:''; };
+const turnoutLine = (t, vd) => { const T=turnoutOf(t,vd); if(!T||!T.voters) return '';
+ if(T.early) return `<div class="tline"><b>${fmt(T.voters)}</b> votes counted so far, from ${(T.frac*100).toFixed(0)}% of voting districts. Turnout shows once half are in.</div>`;
+ return T.final ? `<div class="tline">Turnout <b>${pctTxt(T.rate)}</b>: ${fmt(T.voters)} of ${fmt(T.reg)} registered voters voted</div>`
+  : `<div class="tline">Turnout about <b>${pctTxt(T.rate)}</b> (estimate) · ${fmt(T.voters)} votes counted so far</div>`; };
 
 /* ---------- "Which councils / wards?" dialog ---------- */
 const WON = {pid:null, kind:'councils', scope:'', prov:'', wk:'won'};
@@ -1855,7 +1876,7 @@ function councilTable(codes){
   <td>${statusPill(s)}${s.vpct?`<div class="src">${s.vpct.toFixed(1)}% of the vote</div>`:''}</td>
   <td style="min-width:200px">${seatBar(m)}</td>
   <td style="min-width:160px">${stack(w.list.map(x=>[x[0],x[1]]),w.total,'thin')}<div class="tally">${w.list.slice(0,2).map(([id,n])=>`<span>${chip(id)} <b>${n}</b></span>`).join('')}<span>of ${w.total}</span></div></td>
-  <td class="num">${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}%${(()=>{const T=turnoutOf(m.turnout,m.prog.vd);return T&&T.voters?`<div class="src">turnout ${T.final?'':'~'}${pctTxt(T.rate)}</div>`:''})()}</td></tr>`}).join('')}
+  <td class="num">${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}%${(()=>{const T=turnoutOf(m.turnout,m.prog.vd);return T&&T.voters&&!T.early?`<div class="src">turnout ${T.final?'':'~'}${pctTxt(T.rate)}</div>`:''})()}</td></tr>`}).join('')}
  </tbody></table></div>`;
 }
 
@@ -2053,7 +2074,7 @@ function trackTile(x, pip){
    <span class="trk-lead">${p?`${chip(i.lead[0])} <b>${i.lead[2].toFixed(1)}%</b>`:'<span class="src">Waiting for votes</span>'}</span>
    <span class="trk-s">${esc(i.status)}</span>
    <span class="bar"><i style="width:${(c*100).toFixed(1)}%"></i></span>
-   <span class="trk-s">${(c*100).toFixed(0)}% counted${i.T&&i.T.voters?` · turnout ${i.T.final?'':'~'}${pctTxt(i.T.rate)}`:''}${i.ballots?` · ${fmt(i.ballots)} ballots`:''}</span></button>
+   <span class="trk-s">${(c*100).toFixed(0)}% counted${i.T&&i.T.voters&&!i.T.early?` · turnout ${i.T.final?'':'~'}${pctTxt(i.T.rate)}`:''}${i.ballots?` · ${fmt(i.ballots)} ballots`:''}</span></button>
    ${pip?'':`<button class="trk-x" data-trkrm="${trkAttr(x)}" aria-label="Stop tracking ${esc(i.title)}">×</button>`}</div>`;
 }
 const canPip = () => 'documentPictureInPicture' in window;
