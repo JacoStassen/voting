@@ -5,8 +5,8 @@ name: Live results relay
 #
 # GitHub's cron is best effort (often 10-30 minutes late), so each run loops for about
 # 25 minutes, fetching every minute, then starts the next run itself. The schedule is
-# only a backstop in case that chain breaks. Once counting is complete, runs fetch
-# once and stop chaining.
+# only a backstop in case that chain breaks. Once counting is complete (or after
+# counting week), the workflow disables itself, which stops the cron as well.
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -103,16 +103,22 @@ jobs:
 
   next:
     needs: fetch
-    # Keep the chain going (even if this run failed) until counting is complete.
-    if: always() && needs.fetch.outputs.final != 'true'
+    # Keep the chain going (even if this run failed) until counting is complete,
+    # then switch the workflow off so the cron backstop stops too.
+    if: always()
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Start the next run
+      - name: Start the next run, or stop for good
         run: |
-          # Safety stop: no self-chaining after counting week (the cron backstop still runs).
-          if [ "$(date -u +%Y%m%d)" -gt 20261112 ]; then echo "Past cutoff, not chaining"; exit 0; fi
+          # Counting complete, or past counting week: disable this workflow (cron included).
+          # Re-enable with: gh workflow enable live-results.yml
+          if [ "${{ needs.fetch.outputs.final }}" = "true" ] || [ "$(date -u +%Y%m%d)" -gt 20261112 ]; then
+            echo "Counting complete or past cutoff; disabling the relay"
+            gh workflow disable live-results.yml --repo "$GITHUB_REPOSITORY"
+            exit 0
+          fi
           # Don't spin if the fetch job is failing fast.
           if [ "${{ needs.fetch.result }}" != "success" ]; then sleep 120; fi
           gh workflow run live-results.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
