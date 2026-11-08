@@ -805,7 +805,7 @@ function applyMode(){
  const days = Math.ceil((new Date('2026-11-04T07:00:00+02:00') - new Date())/86400000);
  document.getElementById('countdown').textContent = nat
   ? 'The next national and provincial election is due by mid-2029.'
-  : (days>1 ? days+' days until voting stations open on 4 November.' : days===1 ? 'Voting stations open tomorrow.' : Date.now()>=POLLS_CLOSE ? 'Voting has closed and counting is under way. Follow it on the Live results tab.' : 'Local election day: 4 November 2026.');
+  : (days>1 ? days+' days until voting stations open on 4 November.' : days===1 ? 'Voting stations open tomorrow.' : Date.now()>=POLLS_CLOSE ? (resFinal() ? 'Voting has closed and counting is complete. See the final results on the Results tab.' : 'Voting has closed and counting is under way. Follow it on the Live results tab.') : 'Local election day: 4 November 2026.');
  renderAll();
 }
 function toggleMode(){state.mode = state.mode==='local'?'national':'local'; store.set('mode',state.mode); applyMode()}
@@ -1395,11 +1395,11 @@ function wardTableHTML(code, wardNo){
  const lp = lead && rp(lead[0]);
  const head26 = !live26 ? '' : lead
   ? `<div class="live26" style="--c:${lp.c}"><span class="live-dot ${lead[2]?'final':''}" aria-hidden="true"></span><div><b>2026: ${esc(lp.name)} ${lead[2]?'won':'is leading'}</b> with ${lead[1].toFixed(1)}% of the ward vote.${wt?` <span class="src">${fmt(wt[0])} ballots counted${wt[1]<wt[2]?`, ${wt[1]} of ${wt[2]} voting districts in`:''}.</span>`:''}
-     <button class="plink" data-gores="${esc(code)}" data-goresward="${wardNo}">See it in Live results</button></div></div>`
-  : `<div class="live26" style="--c:var(--line)"><span class="live-dot" aria-hidden="true"></span><div><b>2026:</b> no votes counted in this ward yet. <span class="src">This updates every minute.</span></div></div>`;
+     <button class="plink" data-gores="${esc(code)}" data-goresward="${wardNo}">See it in ${resLabel()}</button></div></div>`
+  : `<div class="live26" style="--c:var(--line)"><span class="live-dot" aria-hidden="true"></span><div><b>2026:</b> ${resFinal()?'no votes recorded for this ward.':'no votes counted in this ward yet. <span class="src">This updates every minute.</span>'}</div></div>`;
  const col26 = !!vm;
  return `<div class="ward-head"><div><h3>Ward ${wardNo}, ${esc(m[1])}</h3>${head26}<p class="src">${rows.length} candidates. ${head21} Ward lines were redrawn for 2026, so the same number may not cover exactly the same streets.</p></div></div>
- <div class="cmp-scroll"><table class="wt"><thead><tr><th scope="col">Party</th><th scope="col">Candidate</th><th scope="col" class="n">Age</th>${col26?`<th scope="col">2026 ward vote <span class="src">(live)</span></th>`:''}<th scope="col">Party's 2021 vote here</th></tr></thead><tbody>
+ <div class="cmp-scroll"><table class="wt"><thead><tr><th scope="col">Party</th><th scope="col">Candidate</th><th scope="col" class="n">Age</th>${col26?`<th scope="col">2026 ward vote${resFinal()?'':' <span class="src">(live)</span>'}</th>`:''}<th scope="col">Party's 2021 vote here</th></tr></thead><tbody>
  ${rows.map(c=>{const pp=candParty(c); const isW = winner && pp.code===winner; const col=pp.p?pp.p.c:(pp.code==='IND'?'#6B6F7A':'#9A9AA5');
    const v=votesOf(c), share=v!=null&&tot?v/tot*100:null, L=isLead(c);
    return `<tr class="${(col26?L:isW)?'won':''}"><td><span class="pdot" style="--c:${col}"></span>${pp.p?`<button class="plink" data-goparty="${pp.p.id}">${esc(pp.p.abbr)}</button>`:`<span title="${esc(pp.name)}">${esc(pp.code==='IND'?'Independent':pp.code)}</span>`}<span class="pname">${esc(pp.p?pp.p.name:pp.name)}</span></td>
@@ -1493,6 +1493,10 @@ async function liveUrls(){
  return [shaVal ? RAW_BASE+shaVal+'/live.json' : null, RAW_BASE+'live-data/live.json', 'results/live.json'].filter(Boolean);
 }
 const IEC_DASH = 'https://results.elections.org.za/dashboards/lge/';
+/* Counting complete: every council declared and every voting district in (the relay's
+   own stop rule). The site then drops its "live" wording and stops checking each minute. */
+const resFinal = () => { try{ const p=R.data&&R.data.prog; return !!(p && p.munis[1] && p.munis[0]>=p.munis[1] && p.vd[1] && p.vd[0]>=p.vd[1]); }catch(e){ return false; } }; // R may not exist yet on first paint
+const resLabel = () => resFinal() ? 'Results' : 'Live results';
 const IEC2SITE = {'ANC':'anc','DA':'da','MKP':'mk','EFF':'eff','IFP':'ifp','PA':'pa','VF PLUS':'ffplus','ACTIONSA':'actionsa','ACDP':'acdp','UDM':'udm','ATM':'atm','BOSA':'bosa','RISE':'rise','GOOD':'good','ALJAMA':'aljamaah','SACP':'sacp','MAYIBUYE':'amm'};
 const IEC2CAND = {'MKP':'M.K'};
 const METRO_ORDER = ['JHB','TSH','EKU','ETH','CPT','NMA','MAN','BUF'];
@@ -1519,6 +1523,8 @@ async function loadResults(){
  R.loadedAt = Date.now(); R.busy=false;
  const pill=document.getElementById('livePill');
  if(pill) pill.hidden = !(R.data && R.data.prog.vd[0]>0 && R.data.prog.vd[0]<R.data.prog.vd[1]);
+ const tab=document.getElementById('resTab'); if(tab && tab.firstChild && tab.firstChild.nodeType===3) tab.firstChild.nodeValue=resLabel()+' ';
+ const cd=document.getElementById('countdown'); if(cd && resFinal() && cd.textContent.includes('counting is under way')) cd.textContent='Voting has closed and counting is complete. See the final results on the Results tab.';
  if(state.tab==='results') renderResults();
 }
 function setRes(patch){
@@ -1659,7 +1665,9 @@ function shareText(code){
  const rows=byVotes(partyRows(m)).slice(0,5).map(r=>{ const b=base&&base.find(x=>x[0]===r[0]), d=b?r[2]-b[1]:null;
   return `${rp(r[0]).abbr} ${r[2].toFixed(1)}%${d==null?'':` (${d>=0?'▲':'▼'}${Math.abs(d).toFixed(1)})`}`; });
  const t=new Date(R.data.report||R.data.fetched).toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
- return `🗳️ ${muniName(code)}: live results at ${t}, ${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted\n${rows.join(' · ')||'No votes counted yet'}\n${s.text}${base?' (▲▼ vs 2021)':''}\nFollow live: ${SITE}?council=${code}`;
+ return resFinal()
+  ? `🗳️ ${muniName(code)}: final results\n${rows.join(' · ')||'No votes counted'}\n${s.text}${base?' (▲▼ vs 2021)':''}\nSee them: ${SITE}?council=${code}`
+  : `🗳️ ${muniName(code)}: live results at ${t}, ${pct(m.prog.vd[0],m.prog.vd[1]).toFixed(0)}% counted\n${rows.join(' · ')||'No votes counted yet'}\n${s.text}${base?' (▲▼ vs 2021)':''}\nFollow live: ${SITE}?council=${code}`;
 }
 const shareRow = code => `<div class="share-row"><button class="btn ghost small" data-rwa="${code}">Share on WhatsApp</button>${navigator.share?`<button class="btn ghost small" data-rshare="${code}">Share…</button>`:''}</div>`;
 
@@ -1691,7 +1699,7 @@ function feedCard(){
  const hm=iso=>new Date(iso).toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
  return `<div class="card" style="margin:0 0 24px"><h3>What's changed</h3>${f.length
   ?`<ul class="feed" aria-live="polite">${f.slice(0,R.feedAll?50:6).map(x=>`<li class="${x.big?'big':''}"><time datetime="${esc(x.t)}">${hm(x.t)}</time><span class="fdot" style="${x.p!=null?`--c:${rp(x.p).c}`:''}" aria-hidden="true"></span><span>${x.c?`<button class="plink" data-rmuni="${esc(x.c)}">${esc(x.m)}</button>`:esc(x.m)}</span></li>`).join('')}</ul>${f.length>6?`<button class="plink" data-rfeed="1" style="margin-top:8px">${R.feedAll?'Show fewer':`Show all ${f.length}`}</button>`:''}`
-  :`<p class="src" style="margin:0">Councils being declared and lead changes in the metros will appear here as new results come in. Keep this page open; it checks every minute.</p>`}</div>`;
+  :`<p class="src" style="margin:0">Councils being declared and lead changes in the metros will appear here as new results come in. ${resFinal()?'':'Keep this page open; it checks every minute.'}</p>`}</div>`;
 }
 
 /* ---------- Turnout ----------
@@ -1927,7 +1935,7 @@ function resHeader(){
  const ago=Math.round((Date.now()-Date.parse(d.fetched))/60000);
  return `${d.year!=='2026'?`<div class="notice res-test"><b>Test data.</b> This shows the ${esc(d.year)} results, not 2026.</div>`:''}
  <div class="res-meta"><span><span class="live-dot ${final?'final':''}" aria-hidden="true"></span><b>${final?'Final results':p.vd[0]?'Counting in progress':'Waiting for the first results'}</b></span>
-  <span>IEC update: ${tm(d.report)}</span><span>Copied ${ago<1?'just now':ago+' min ago'}</span>
+  <span>IEC update: ${tm(d.report)}</span>${final?'':`<span>Copied ${ago<1?'just now':ago+' min ago'}</span>`}
   <button class="btn ghost small" id="resRefresh">Refresh</button>
   <a href="${IEC_DASH}" target="_blank" rel="noopener">Official IEC dashboard</a></div>
  <div class="prog-grid">
@@ -2091,7 +2099,7 @@ function viewWards(){
 
 function renderResults(){
  const s=document.getElementById('s-results'); if(!s) return;
- const head=`<h2 id="h-results">Live results: 2026 local elections</h2>`;
+ const head=`<h2 id="h-results">${resFinal()?'Final results':'Live results'}: 2026 local elections</h2>`;
  if(!R.data){
   s.innerHTML = head+(R.loadedAt===0?`<p class="intro">Loading the latest results…</p>`
    :`<div class="notice">Live results will appear here as the IEC publishes them. Voting closed at 21:00 on 4 November; councils usually start declaring within a few hours. Meanwhile, the <a href="${IEC_DASH}" target="_blank" rel="noopener">official IEC results dashboard</a> has the same figures.</div>`);
@@ -2104,7 +2112,7 @@ function renderResults(){
  const typing = keepFocus && keepFocus.id==='rq';
  if(typing) return; // don't redraw under someone typing in the council search
  s.innerHTML = head+resHeader()+`<div id="resBody">${views[R.view]()}</div>`+
-  `<p class="src" style="margin-top:22px">Source: Electoral Commission of South Africa results feed, copied here about once a minute. Figures can change until the IEC declares each council. Ward candidate names come from the IEC's certified list; check the <a href="${IEC_DASH}" target="_blank" rel="noopener">IEC dashboard</a> for official results.</p>`;
+  `<p class="src" style="margin-top:22px">Source: Electoral Commission of South Africa results feed, ${resFinal()?'as at the final IEC update. Counting is complete and this page is no longer updated.':'copied here about once a minute. Figures can change until the IEC declares each council.'} Ward candidate names come from the IEC's certified list; check the <a href="${IEC_DASH}" target="_blank" rel="noopener">IEC dashboard</a> for official results.</p>`;
  if(sel){ try{ const el=s.querySelector(sel); el&&el.focus({preventScroll:true}); }catch(e){} }
  segbarCheck();
  if(R.view==='wards' && document.getElementById('rq')) wireCombo('rq','sugg3',(label,m)=>{ if(!R.data.munis[m.code]) return; document.getElementById('rq').blur(); setRes({muni:m.code, ward:null, hl:null}); });
@@ -2147,7 +2155,7 @@ const TRK = {list:store.get('track',[]), pip:null, max:6};
 const trkId = x => x.t+':'+(x.k||'')+(x.w!=null?':'+x.w:'');
 const isTracked = x => TRK.list.some(y=>trkId(y)===trkId(x));
 const trkAttr = x => esc(JSON.stringify(x));
-function trackBtn(x){ const on=isTracked(x); return `<button class="trkbtn" aria-pressed="${on}" data-trk="${trkAttr(x)}">${on?'<span aria-hidden="true">★</span> Tracking':'<span aria-hidden="true">☆</span> Track live'}</button>`; }
+function trackBtn(x){ const on=isTracked(x); return `<button class="trkbtn" aria-pressed="${on}" data-trk="${trkAttr(x)}">${on?'<span aria-hidden="true">★</span> Tracking':`<span aria-hidden="true">☆</span> ${resFinal()?'Track':'Track live'}`}</button>`; }
 function declaredIn(codes){ const c=councilTally(codes); return c.list.reduce((a,y)=>a+y[1],0)+c.hung; }
 function trackInfo(x){
  const d=R.data; if(!d) return null;
@@ -2182,7 +2190,7 @@ const canPip = () => 'documentPictureInPicture' in window;
 const canAlert = () => 'Notification' in window;
 const alertsOn = () => store.get('trkAlert',false) && canAlert() && Notification.permission==='granted';
 function trackPanel(){
- if(!TRK.list.length) return `<p class="trktip"><span aria-hidden="true">☆</span> Tap <b>Track live</b> on the country, a province, district, council or ward to pin it here${canPip()?', pop it out into a floating window':''}${canAlert()?' and get alerts when it changes':''}.</p>`;
+ if(!TRK.list.length) return `<p class="trktip"><span aria-hidden="true">☆</span> Tap <b>${resFinal()?'Track':'Track live'}</b> on the country, a province, district, council or ward to pin it here${canPip()?', pop it out into a floating window':''}${canAlert()&&!resFinal()?' and get alerts when it changes':''}.</p>`;
  const al=alertsOn();
  return `<section class="trkpanel" aria-label="Areas you're tracking"><div class="trkpanel-h"><h3>Tracking</h3>
   ${canPip()?`<button class="btn ghost small" data-trkpip="1">${TRK.pip?'Pop-out is open':'Pop out'}</button>`:''}
@@ -2219,7 +2227,7 @@ function trackToast(x){
  else if(canAlert() && Notification.permission==='denied') note=`Alerts are blocked for this site. You can allow them in your browser's site settings.`;
  else if(canAlert()) note=`Alerts are off. Turn them on in the Tracking panel any time.`;
  else if(isIOS() && !isInstalled()) note=`To get alerts on an iPhone or iPad, add this site to your Home Screen (Share, then Add to Home Screen) and open it from there.`;
- else note=`This browser can't show alerts, but the tile updates every minute.`;
+ else note=resFinal()?`Counting is complete, so this tile won't change.`:`This browser can't show alerts, but the tile updates every minute.`;
  showToast(`<p><b><span aria-hidden="true">★</span> Tracking ${esc(x.t==='ward'?i.title+', '+i.sub:i.title)}.</b> ${note}</p>
   <div class="toast-a"><button class="btn small" data-tview>See it</button>${canPip()&&!TRK.pip?`<button class="btn ghost small" data-tpip>Pop out window</button>`:''}<button class="btn ghost small" data-tclose aria-label="Dismiss">OK</button></div>`);
 }
@@ -2306,8 +2314,8 @@ async function popOut(){
  TRK.pip=w; paintPip(); renderResults();
 }
 function paintPip(){
- if(!TRK.pip) return; const d=TRK.pip.document; d.title='Live results';
- d.body.innerHTML=`<div class="pip"><div class="pip-h"><span><span class="live-dot" aria-hidden="true"></span><b>Live results</b></span><span class="src">${R.data?'IEC update '+esc(tm(R.data.report)):''}</span></div>
+ if(!TRK.pip) return; const d=TRK.pip.document; d.title=resLabel();
+ d.body.innerHTML=`<div class="pip"><div class="pip-h"><span><span class="live-dot ${resFinal()?'final':''}" aria-hidden="true"></span><b>${resLabel()}</b></span><span class="src">${R.data?'IEC update '+esc(tm(R.data.report)):''}</span></div>
   ${TRK.list.length?TRK.list.map(x=>trackTile(x,true)).join(''):'<p class="src">Track an area on the Live results page to see it here.</p>'}</div>`;
 }
 function onResultsLoaded(){ try{ trackSigs(true); paintPip(); paintBadge(); }catch(e){} }
@@ -2334,7 +2342,7 @@ function navLabel(sn){
   if(r.view==='wards' && r.muni && R.data) return (r.ward!=null?`ward ${r.ward}, `:'')+muniName(r.muni);
   if(r.view==='provinces' && r.prov) return PROV[r.prov];
   if(r.view==='districts' && r.dist) return r.dist.split('|')[1]+' District';
-  return {overview:'Live results',provinces:'all provinces',metros:'the metros',districts:'all districts',wards:'Live results'}[r.view]||'Live results'; }
+  return {overview:resLabel(),provinces:'all provinces',metros:'the metros',districts:'all districts',wards:resLabel()}[r.view]||resLabel(); }
  if(sn.tab==='cands' && sn.c.view==='wards' && sn.c.code && sn.c.ward!=null) return `ward ${sn.c.ward} candidates`;
  return tabLabel(sn.tab);
 }
@@ -2391,13 +2399,13 @@ try{ const h=history.state; history.replaceState({...(h||{}), ...navSnap(), y:sc
 NAV.ready=true; paintBack();
 onAppShown();
 loadResults();
-setInterval(()=>{ if(document.visibilityState==='visible' || TRK.pip || store.get('trkAlert',false)) loadResults(); }, 60000);
+setInterval(()=>{ if(resFinal()) return; if(document.visibilityState==='visible' || TRK.pip || store.get('trkAlert',false)) loadResults(); }, 60000);
 if('serviceWorker' in navigator){
  navigator.serviceWorker.register('sw.js').catch(()=>{});
  navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.type==='open' && e.data.url) location.href=e.data.url; });
 }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') onAppShown(); });
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && Date.now()-R.loadedAt>60000) loadResults(); });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && !resFinal() && Date.now()-R.loadedAt>60000) loadResults(); });
 </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
   "name": "Know your ballot: South Africa 2026",
   "short_name": "Know your ballot",
-  "description": "Live 2026 local election results, parties and the candidates in your ward.",
+  "description": "2026 local election results, parties and the candidates in your ward.",
   "id": "/",
   "start_url": "/?source=homescreen",
   "scope": "/",
@@ -17,7 +17,7 @@
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Live results", "url": "/?tab=results", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Results", "url": "/?tab=results", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Candidates in my ward", "url": "/?tab=cands", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }
