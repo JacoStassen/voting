@@ -1724,7 +1724,12 @@ const IEC_DASH = 'https://results.elections.org.za/dashboards/lge/';
 /* Counting complete: every council declared and every voting district in (the relay's
    own stop rule). The site then drops its "live" wording and stops checking each minute. */
 const resFinal = () => { try{ const p=R.data&&R.data.prog; return !!(p && p.munis[1] && p.munis[0]>=p.munis[1] && p.vd[1] && p.vd[0]>=p.vd[1]); }catch(e){ return false; } }; // R may not exist yet on first paint
-const resLabel = () => resFinal() ? 'Results' : 'Live results';
+/* Nearly complete: at least 99% of voting districts are in, but a few wards or councils are still
+   contested. The relay then only runs a few times a day, so the site drops its "live" wording
+   and checks every 30 minutes instead of every minute. */
+const resNearly = () => { try{ const p=R.data&&R.data.prog; return !!(p && p.vd[1] && p.vd[0]/p.vd[1]>=0.99 && !resFinal()); }catch(e){ return false; } };
+const resQuiet = () => resFinal() || resNearly();
+const resLabel = () => resQuiet() ? 'Results' : 'Live results';
 const IEC2SITE = {'ANC':'anc','DA':'da','MKP':'mk','EFF':'eff','IFP':'ifp','PA':'pa','VF PLUS':'ffplus','ACTIONSA':'actionsa','ACDP':'acdp','UDM':'udm','ATM':'atm','BOSA':'bosa','RISE':'rise','GOOD':'good','ALJAMA':'aljamaah','SACP':'sacp','MAYIBUYE':'amm'};
 const IEC2CAND = {'MKP':'M.K'};
 const METRO_ORDER = ['JHB','TSH','EKU','ETH','CPT','NMA','MAN','BUF'];
@@ -1750,7 +1755,7 @@ async function loadResults(){
  }catch(e){ R.err = e; }
  R.loadedAt = Date.now(); R.busy=false;
  const pill=document.getElementById('livePill');
- if(pill) pill.hidden = !(R.data && R.data.prog.vd[0]>0 && R.data.prog.vd[0]<R.data.prog.vd[1]);
+ if(pill) pill.hidden = !(R.data && R.data.prog.vd[0]>0 && R.data.prog.vd[0]<R.data.prog.vd[1]) || resNearly();
  const tab=document.getElementById('resTab'); if(tab && tab.firstChild && tab.firstChild.nodeType===3) tab.firstChild.nodeValue=resLabel()+' ';
  const cd=document.getElementById('countdown'); if(cd && resFinal() && cd.textContent.includes('counting is under way')) cd.textContent='Voting has closed and counting is complete. See the final results on the Results tab.';
  if(state.tab==='results') renderResults();
@@ -1927,7 +1932,7 @@ function feedCard(){
  const hm=iso=>new Date(iso).toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
  return `<div class="card" style="margin:0 0 24px"><h3>What's changed</h3>${f.length
   ?`<ul class="feed" aria-live="polite">${f.slice(0,R.feedAll?50:6).map(x=>`<li class="${x.big?'big':''}"><time datetime="${esc(x.t)}">${hm(x.t)}</time><span class="fdot" style="${x.p!=null?`--c:${rp(x.p).c}`:''}" aria-hidden="true"></span><span>${x.c?`<button class="plink" data-rmuni="${esc(x.c)}">${esc(x.m)}</button>`:esc(x.m)}</span></li>`).join('')}</ul>${f.length>6?`<button class="plink" data-rfeed="1" style="margin-top:8px">${R.feedAll?'Show fewer':`Show all ${f.length}`}</button>`:''}`
-  :`<p class="src" style="margin:0">Councils being declared and lead changes in the metros will appear here as new results come in. ${resFinal()?'':'Keep this page open; it checks every minute.'}</p>`}</div>`;
+  :`<p class="src" style="margin:0">Councils being declared and lead changes in the metros will appear here as new results come in. ${resQuiet()?'':'Keep this page open; it checks every minute.'}</p>`}</div>`;
 }
 
 /* ---------- Turnout ----------
@@ -2162,8 +2167,8 @@ function resHeader(){
  const d=R.data, p=d.prog, final=p.vd[1]>0 && p.vd[0]>=p.vd[1], t=d.turnout;
  const ago=Math.round((Date.now()-Date.parse(d.fetched))/60000);
  return `${d.year!=='2026'?`<div class="notice res-test"><b>Test data.</b> This shows the ${esc(d.year)} results, not 2026.</div>`:''}
- <div class="res-meta"><span><span class="live-dot ${final?'final':''}" aria-hidden="true"></span><b>${final?'Final results':p.vd[0]?'Counting in progress':'Waiting for the first results'}</b></span>
-  <span>IEC update: ${tm(d.report)}</span>${final?'':`<span>Copied ${ago<1?'just now':ago+' min ago'}</span>`}
+ <div class="res-meta"><span><span class="live-dot ${final?'final':''}" aria-hidden="true"></span><b>${final?'Final results':resNearly()?'Counting nearly complete':p.vd[0]?'Counting in progress':'Waiting for the first results'}</b></span>
+  <span>IEC update: ${tm(d.report)}</span>${final?'':`<span>Copied ${ago<1?'just now':ago<120?ago+' min ago':Math.round(ago/60)+' h ago'}</span>`}
   <button class="btn ghost small" id="resRefresh">Refresh</button>
   <a href="${IEC_DASH}" target="_blank" rel="noopener">Official IEC dashboard</a></div>
  <div class="prog-grid">
@@ -2327,7 +2332,7 @@ function viewWards(){
 
 function renderResults(){
  const s=document.getElementById('s-results'); if(!s) return;
- const head=`<h2 id="h-results">${resFinal()?'Final results':'Live results'}: 2026 local elections</h2>`;
+ const head=`<h2 id="h-results">${resFinal()?'Final results':resNearly()?'Results':'Live results'}: 2026 local elections</h2>`;
  if(!R.data){
   s.innerHTML = head+(R.loadedAt===0?`<p class="intro">Loading the latest results…</p>`
    :`<div class="notice">Live results will appear here as the IEC publishes them. Voting closed at 21:00 on 4 November; councils usually start declaring within a few hours. Meanwhile, the <a href="${IEC_DASH}" target="_blank" rel="noopener">official IEC results dashboard</a> has the same figures.</div>`);
@@ -2340,7 +2345,7 @@ function renderResults(){
  const typing = keepFocus && keepFocus.id==='rq';
  if(typing) return; // don't redraw under someone typing in the council search
  s.innerHTML = head+resHeader()+`<div id="resBody">${views[R.view]()}</div>`+
-  `<p class="src" style="margin-top:22px">Source: Electoral Commission of South Africa results feed, ${resFinal()?'as at the final IEC update. Counting is complete and this page is no longer updated.':'copied here about once a minute. Figures can change until the IEC declares each council.'} Ward candidate names come from the IEC's certified list; check the <a href="${IEC_DASH}" target="_blank" rel="noopener">IEC dashboard</a> for official results.</p>`;
+  `<p class="src" style="margin-top:22px">Source: Electoral Commission of South Africa results feed, ${resFinal()?'as at the final IEC update. Counting is complete and this page is no longer updated.':resNearly()?'copied here a few times a day now that the count is nearly complete. A few contested wards are still to come, and figures can change until the IEC declares each council.':'copied here about once a minute. Figures can change until the IEC declares each council.'} Ward candidate names come from the IEC's certified list; check the <a href="${IEC_DASH}" target="_blank" rel="noopener">IEC dashboard</a> for official results.</p>`;
  if(sel){ try{ const el=s.querySelector(sel); el&&el.focus({preventScroll:true}); }catch(e){} }
  segbarCheck();
  if(R.view==='wards' && document.getElementById('rq')) wireCombo('rq','sugg3',(label,m)=>{ if(!R.data.munis[m.code]) return; document.getElementById('rq').blur(); setRes({muni:m.code, ward:null, hl:null}); });
@@ -2418,7 +2423,7 @@ const canPip = () => 'documentPictureInPicture' in window;
 const canAlert = () => 'Notification' in window;
 const alertsOn = () => store.get('trkAlert',false) && canAlert() && Notification.permission==='granted';
 function trackPanel(){
- if(!TRK.list.length) return `<p class="trktip"><span aria-hidden="true">☆</span> Tap <b>${resFinal()?'Track':'Track live'}</b> on the country, a province, district, council or ward to pin it here${canPip()?', pop it out into a floating window':''}${canAlert()&&!resFinal()?' and get alerts when it changes':''}.</p>`;
+ if(!TRK.list.length) return `<p class="trktip"><span aria-hidden="true">☆</span> Tap <b>${resQuiet()?'Track':'Track live'}</b> on the country, a province, district, council or ward to pin it here${canPip()?', pop it out into a floating window':''}${canAlert()&&!resFinal()?' and get alerts when it changes':''}.</p>`;
  const al=alertsOn();
  return `<section class="trkpanel" aria-label="Areas you're tracking"><div class="trkpanel-h"><h3>Tracking</h3>
   ${canPip()?`<button class="btn ghost small" data-trkpip="1">${TRK.pip?'Pop-out is open':'Pop out'}</button>`:''}
@@ -2455,7 +2460,7 @@ function trackToast(x){
  else if(canAlert() && Notification.permission==='denied') note=`Alerts are blocked for this site. You can allow them in your browser's site settings.`;
  else if(canAlert()) note=`Alerts are off. Turn them on in the Tracking panel any time.`;
  else if(isIOS() && !isInstalled()) note=`To get alerts on an iPhone or iPad, add this site to your Home Screen (Share, then Add to Home Screen) and open it from there.`;
- else note=resFinal()?`Counting is complete, so this tile won't change.`:`This browser can't show alerts, but the tile updates every minute.`;
+ else note=resFinal()?`Counting is complete, so this tile won't change.`:`This browser can't show alerts, but the tile updates ${resNearly()?'a few times a day':'every minute'}.`;
  showToast(`<p><b><span aria-hidden="true">★</span> Tracking ${esc(x.t==='ward'?i.title+', '+i.sub:i.title)}.</b> ${note}</p>
   <div class="toast-a"><button class="btn small" data-tview>See it</button>${canPip()&&!TRK.pip?`<button class="btn ghost small" data-tpip>Pop out window</button>`:''}<button class="btn ghost small" data-tclose aria-label="Dismiss">OK</button></div>`);
 }
@@ -2627,13 +2632,13 @@ try{ const h=history.state; history.replaceState({...(h||{}), ...navSnap(), y:sc
 NAV.ready=true; paintBack();
 onAppShown();
 loadResults();
-setInterval(()=>{ if(resFinal()) return; if(document.visibilityState==='visible' || TRK.pip || store.get('trkAlert',false)) loadResults(); }, 60000);
+setInterval(()=>{ if(resFinal()) return; if(resNearly() && Date.now()-R.loadedAt<1800000) return; if(document.visibilityState==='visible' || TRK.pip || store.get('trkAlert',false)) loadResults(); }, 60000);
 if('serviceWorker' in navigator){
  navigator.serviceWorker.register('sw.js').catch(()=>{});
  navigator.serviceWorker.addEventListener('message', e=>{ if(e.data && e.data.type==='open' && e.data.url) location.href=e.data.url; });
 }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') onAppShown(); });
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && !resFinal() && Date.now()-R.loadedAt>60000) loadResults(); });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && !resFinal() && Date.now()-R.loadedAt>(resNearly()?1800000:60000)) loadResults(); });
 </script>
 </body>
 </html>
