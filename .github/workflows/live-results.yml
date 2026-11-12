@@ -3,13 +3,13 @@ name: Live results relay
 # Copies the IEC's 2026 local-election results to the `live-data` branch (live.json),
 # which the site reads via raw.githubusercontent.com (the IEC feed blocks cross-site reads).
 #
-# GitHub's cron is best effort (often 10-30 minutes late), so each run loops for about
-# 25 minutes, fetching every minute, then starts the next run itself. The schedule is
-# only a backstop in case that chain breaks. Once counting is complete (or after
-# counting week), the workflow disables itself, which stops the cron as well.
+# The results are in and only a few wards are still contested, so each run now does a
+# single fetch and the schedule fires a few times a day. If every ward is declared the
+# workflow disables itself. To go back to near-live updates, set LOOP_MINUTES to 25,
+# use cron "*/5 * * * *" and restore the self-chaining `next` job (see git history).
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "17 5,11,17,23 * * *"
   workflow_dispatch:
 
 permissions:
@@ -31,10 +31,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Fetch and publish every minute
+      - name: Fetch and publish once
         id: loop
         env:
-          LOOP_MINUTES: "25"
+          LOOP_MINUTES: "0"
         run: |
           git config user.name "results-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -101,24 +101,12 @@ jobs:
           done
           echo "final=$final" >> "$GITHUB_OUTPUT"
 
-  next:
+  stop-when-final:
     needs: fetch
-    # Keep the chain going (even if this run failed) until counting is complete,
-    # then switch the workflow off so the cron backstop stops too.
-    if: always()
+    if: needs.fetch.outputs.final == 'true'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Start the next run, or stop for good
-        run: |
-          # Counting complete, or past counting week: disable this workflow (cron included).
-          # Re-enable with: gh workflow enable live-results.yml
-          if [ "${{ needs.fetch.outputs.final }}" = "true" ] || [ "$(date -u +%Y%m%d)" -gt 20261112 ]; then
-            echo "Counting complete or past cutoff; disabling the relay"
-            gh workflow disable live-results.yml --repo "$GITHUB_REPOSITORY"
-            exit 0
-          fi
-          # Don't spin if the fetch job is failing fast.
-          if [ "${{ needs.fetch.result }}" != "success" ]; then sleep 120; fi
-          gh workflow run live-results.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
+      - name: Counting complete; disable the relay
+        run: gh workflow disable live-results.yml --repo "$GITHUB_REPOSITORY"
